@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Jeu des Livrets</title>
+<style>
+:root{--bg:#fff8ec;--card:#ffffff;--ink:#2b2140;--muted:#7a6f8a;--accent:#ff7a3d;--accent2:#3db8ff;--good:#2fbf71;--bad:#ef4b5c;--line:#eadfcf}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1726;--card:#2a2338;--ink:#f6f0ff;--muted:#b3a7c7;--line:#3d3450}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;display:flex;justify-content:center}
+.app{width:100%;max-width:480px;padding:20px 16px 40px}
+h1{font-size:2rem;margin:8px 0 4px;text-align:center}
+.sub{text-align:center;color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:18px;margin-bottom:16px}
+h2{font-size:1rem;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.chip{border:2px solid var(--line);background:transparent;color:var(--ink);border-radius:14px;padding:12px 0;font-size:1.1rem;font-weight:700;cursor:pointer}
+.chip.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .chip{flex:1;padding:12px 6px;font-size:.95rem}
+.btn{width:100%;border:0;border-radius:16px;padding:16px;font-size:1.2rem;font-weight:800;background:var(--accent);color:#fff;cursor:pointer;box-shadow:0 4px 0 #c9541f}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #c9541f}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line);box-shadow:none;margin-top:10px}
+.hud{display:flex;justify-content:space-between;font-weight:800;font-size:1.1rem;margin-bottom:10px}
+.bar{height:10px;background:var(--line);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.bar i{display:block;height:100%;background:var(--accent);width:100%;transition:width .2s linear}
+.q{font-size:3.4rem;font-weight:900;text-align:center;margin:18px 0 22px}
+.answers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ans{border:0;border-radius:18px;padding:22px 0;font-size:1.9rem;font-weight:900;background:var(--card);color:var(--ink);border:3px solid var(--line);cursor:pointer}
+.ans.good{background:var(--good);border-color:var(--good);color:#fff}
+.ans.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{border:3px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:16px 0;font-size:1.6rem;font-weight:800;cursor:pointer}
+.display{text-align:center;font-size:2.4rem;font-weight:900;min-height:56px;border-bottom:3px dashed var(--line);margin-bottom:16px;padding-bottom:6px}
+.display.good{color:var(--good)} .display.bad{color:var(--bad)}
+.big{font-size:4rem;text-align:center;margin:6px 0}
+.center{text-align:center}
+.stars{font-size:2.2rem;text-align:center;letter-spacing:6px}
+.list{margin:12px 0 0;padding:0;list-style:none;font-size:1.05rem}
+.list li{padding:6px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.hide{display:none}
+.combo{text-align:center;height:24px;font-weight:800;color:var(--accent)}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+.pop{animation:pop .25s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.shake{animation:shake .25s}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- MENU -->
+<section id="menu">
+  <h1>🧮 Jeu des Livrets</h1>
+  <p class="sub">Entraîne-toi aux tables de multiplication</p>
+
+  <div class="card">
+    <h2>Quels livrets ?</h2>
+    <div class="grid" id="tables"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="chip" id="allBtn">Tous</button>
+      <button class="chip" id="noneBtn">Aucun</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Mode de jeu</h2>
+    <div class="row" id="modes">
+      <button class="chip on" data-v="choix">4 choix</button>
+      <button class="chip" data-v="clavier">Je tape</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Durée</h2>
+    <div class="row" id="durees">
+      <button class="chip" data-v="30">30 s</button>
+      <button class="chip on" data-v="60">60 s</button>
+      <button class="chip" data-v="0">Sans chrono</button>
+    </div>
+  </div>
+
+  <button class="btn" id="startBtn">▶ Jouer</button>
+  <div class="card" style="margin-top:16px">
+    <h2>Meilleurs scores</h2>
+    <ul class="list" id="records"></ul>
+  </div>
+</section>
+
+<!-- JEU -->
+<section id="game" class="hide">
+  <div class="hud"><span id="score">⭐ 0</span><span id="timer">⏱ 60</span></div>
+  <div class="bar"><i id="timebar"></i></div>
+  <div class="combo" id="combo"></div>
+  <div class="q" id="question">3 × 4</div>
+  <div class="answers" id="answers"></div>
+  <div id="keypad" class="hide">
+    <div class="display" id="display">&nbsp;</div>
+    <div class="pad" id="pad"></div>
+  </div>
+  <button class="btn ghost" id="quitBtn">Arrêter</button>
+</section>
+
+<!-- RESULTAT -->
+<section id="result" class="hide">
+  <h1>Bravo !</h1>
+  <div class="stars" id="stars"></div>
+  <div class="big" id="finalScore">0</div>
+  <p class="center" id="finalTxt"></p>
+  <div class="card" id="errorsCard">
+    <h2>À revoir</h2>
+    <ul class="list" id="errors"></ul>
+  </div>
+  <button class="btn" id="againBtn">🔁 Rejouer</button>
+  <button class="btn ghost" id="menuBtn">Menu</button>
+</section>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+
+let selected = new Set(store.get('livret_tables',[2,3,4,5]));
+let mode = 'choix', duree = 60;
+
+// --- Menu ---
+function renderTables(){
+  const g=$('tables'); g.innerHTML='';
+  for(let i=1;i<=12;i++){
+    const b=document.createElement('button');
+    b.className='chip'+(selected.has(i)?' on':''); b.textContent=i;
+    b.onclick=()=>{selected.has(i)?selected.delete(i):selected.add(i);store.set('livret_tables',[...selected]);renderTables()};
+    g.appendChild(b);
+  }
+}
+$('allBtn').onclick=()=>{for(let i=1;i<=12;i++)selected.add(i);store.set('livret_tables',[...selected]);renderTables()};
+$('noneBtn').onclick=()=>{selected.clear();store.set('livret_tables',[]);renderTables()};
+function pick(groupId,cb){
+  document.querySelectorAll('#'+groupId+' .chip').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#'+groupId+' .chip').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); cb(b.dataset.v);
+  });
+}
+pick('modes',v=>mode=v);
+pick('durees',v=>duree=+v);
+
+function recKey(){return mode+'_'+duree}
+function renderRecords(){
+  const r=store.get('livret_records',{}); const ul=$('records'); ul.innerHTML='';
+  const labels={choix:'4 choix',clavier:'Je tape'};
+  const ds={30:'30 s',60:'60 s',0:'sans chrono'};
+  let any=false;
+  for(const m of ['choix','clavier'])for(const d of [30,60]){
+    const v=r[m+'_'+d]; if(v==null)continue; any=true;
+    const li=document.createElement('li'); li.innerHTML=`<span>${labels[m]} · ${ds[d]}</span><b>⭐ ${v}</b>`; ul.appendChild(li);
+  }
+  if(!any)ul.innerHTML='<li><span>Pas encore de score</span></li>';
+}
+
+// --- Jeu ---
+let score,combo,timeLeft,tick,current,errors,total,typed,locked;
+function show(id){['menu','game','result'].forEach(s=>$(s).classList.toggle('hide',s!==id))}
+
+function start(){
+  if(selected.size===0){alert('Choisis au moins un livret !');return}
+  score=0;combo=0;errors=[];total=0;timeLeft=duree;
+  $('answers').classList.toggle('hide',mode!=='choix');
+  $('keypad').classList.toggle('hide',mode!=='clavier');
+  $('timer').style.visibility=duree?'visible':'hidden';
+  $('timebar').parentElement.style.visibility=duree?'visible':'hidden';
+  show('game'); next(); updateHud();
+  clearInterval(tick);
+  if(duree){
+    const end=Date.now()+duree*1000;
+    tick=setInterval(()=>{
+      timeLeft=Math.max(0,(end-Date.now())/1000);
+      $('timer').textContent='⏱ '+Math.ceil(timeLeft);
+      $('timebar').style.width=(timeLeft/duree*100)+'%';
+      if(timeLeft<=0)finish();
+    },100);
+  }
+}
+
+function next(){
+  const t=[...selected]; const a=t[Math.floor(Math.random()*t.length)];
+  const b=1+Math.floor(Math.random()*10);
+  let x=a,y=b; if(Math.random()<.5){x=b;y=a}
+  current={a:x,b:y,r:a*b}; locked=false; typed='';
+  const q=$('question'); q.textContent=`${x} × ${y}`; q.classList.remove('pop'); void q.offsetWidth; q.classList.add('pop');
+  if(mode==='choix'){
+    const opts=new Set([current.r]);
+    const cands=[current.r+a,current.r-a,current.r+b,current.r-b,current.r+1,current.r-1,(a+1)*b,a*(b+1),current.r+10,current.r-10];
+    while(opts.size<4){const c=cands[Math.floor(Math.random()*cands.length)];if(c>0)opts.add(c)}
+    const arr=[...opts].sort(()=>Math.random()-.5);
+    const box=$('answers'); box.innerHTML='';
+    arr.forEach(v=>{const btn=document.createElement('button');btn.className='ans';btn.textContent=v;btn.onclick=()=>answer(v,btn);box.appendChild(btn)});
+  } else {
+    $('display').textContent=' '; $('display').className='display';
+  }
+}
+
+function answer(v,btn){
+  if(locked)return; locked=true; total++;
+  const ok=v===current.r;
+  if(ok){score+=1+Math.min(combo,4);combo++}
+  else{combo=0;errors.push(current)}
+  if(mode==='choix'){
+    btn.classList.add(ok?'good':'bad');
+    if(!ok)[...$('answers').children].forEach(c=>{if(+c.textContent===current.r)c.classList.add('good')});
+  } else {
+    const d=$('display'); d.className='display '+(ok?'good':'bad');
+    d.textContent=ok?`${v} ✔`:`${current.r}`;
+    if(!ok){d.classList.add('shake')}
+  }
+  updateHud();
+  setTimeout(()=>{ if(!$('game').classList.contains('hide'))next() }, ok?350:1000);
+  if(!duree&&total>=20)setTimeout(finish,ok?350:1000);
+}
+
+function updateHud(){
+  $('score').textContent='⭐ '+score;
+  $('combo').textContent=combo>=3?`🔥 Série de ${combo} !`:'';
+}
+
+// Pavé numérique
+const keys=['1','2','3','4','5','6','7','8','9','⌫','0','OK'];
+keys.forEach(k=>{
+  const b=document.createElement('button'); b.textContent=k;
+  if(k==='OK'){b.style.background='var(--accent)';b.style.color='#fff';b.style.borderColor='var(--accent)'}
+  b.onclick=()=>press(k); $('pad').appendChild(b);
+});
+function press(k){
+  if(locked||mode!=='clavier')return;
+  if(k==='⌫')typed=typed.slice(0,-1);
+  else if(k==='OK'){if(typed)answer(+typed);return}
+  else if(typed.length<3)typed+=k;
+  $('display').textContent=typed||' ';
+  if(typed.length===String(current.r).length&&+typed===current.r)answer(+typed);
+}
+document.addEventListener('keydown',e=>{
+  if($('game').classList.contains('hide'))return;
+  if(mode==='clavier'){
+    if(/^[0-9]$/.test(e.key))press(e.key);
+    else if(e.key==='Backspace')press('⌫');
+    else if(e.key==='Enter')press('OK');
+  }
+});
+
+function finish(){
+  clearInterval(tick);
+  if($('game').classList.contains('hide'))return;
+  show('result');
+  const good=total-errors.length;
+  $('finalScore').textContent='⭐ '+score;
+  $('finalTxt').textContent=`${good} bonne${good>1?'s':''} réponse${good>1?'s':''} sur ${total}`;
+  const pct=total?good/total:0;
+  $('stars').textContent=pct>=.9?'⭐⭐⭐':pct>=.7?'⭐⭐☆':pct>=.4?'⭐☆☆':'☆☆☆';
+  if(duree){
+    const r=store.get('livret_records',{});
+    if(r[recKey()]==null||score>r[recKey()]){r[recKey()]=score;store.set('livret_records',r);$('finalTxt').textContent+=' · Nouveau record ! 🏆'}
+  }
+  const ul=$('errors'); ul.innerHTML='';
+  const seen=new Set();
+  errors.forEach(e=>{const k=e.a+'x'+e.b;if(seen.has(k))return;seen.add(k);const li=document.createElement('li');li.innerHTML=`<span>${e.a} × ${e.b}</span><b>${e.r}</b>`;ul.appendChild(li)});
+  $('errorsCard').classList.toggle('hide',errors.length===0);
+}
+
+$('startBtn').onclick=start;
+$('againBtn').onclick=start;
+$('quitBtn').onclick=()=>{clearInterval(tick);show('menu');renderRecords()};
+$('menuBtn').onclick=()=>{show('menu');renderRecords()};
+renderTables(); renderRecords();
+</script>
+</body>
+</html>
