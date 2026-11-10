@@ -1,7 +1,7 @@
 {
   "name": "ChronoCats",
   "short_name": "ChronoCats",
-  "description": "Construis ton monde, maîtrise le temps !",
+  "description": "Construis ton monde, maîtrise les livrets !",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

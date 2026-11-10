@@ -10,6 +10,8 @@ import { MissionScreen } from './screens/Mission'
 import { MapScreen } from './screens/MapScreen'
 import { Parent } from './screens/Parent'
 import { MISSIONS } from './game/missions'
+import { FxLayer } from './components/Fx'
+import { Rush } from './screens/Rush'
 
 export type Screen =
   | { name: 'home' }
@@ -19,10 +21,20 @@ export type Screen =
   | { name: 'mission'; missionId: string; focus?: SkillId }
   | { name: 'map' }
   | { name: 'parent' }
+  | { name: 'rush'; focus: SkillId; n?: number }
 
 export type UpdateProfile = (fn: (p: Profile) => void) => void
 
 export default function App() {
+  return (
+    <>
+      <Game />
+      <FxLayer />
+    </>
+  )
+}
+
+function Game() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
   const [profile, setProfile] = useState<Profile | null>(null)
   const [parent, setParent] = useState<ParentSettings>(() => loadParent())
@@ -70,7 +82,9 @@ export default function App() {
     case 'diagnostic':
       return <Diagnostic profile={profile} update={update} onDone={() => go({ name: 'village' })} />
     case 'mission':
-      return <MissionScreen key={screen.missionId + (screen.focus ?? '')} profile={profile} update={update} missionId={screen.missionId} focus={screen.focus} onExit={() => go({ name: 'village' })} />
+      return <MissionScreen key={screen.missionId + (screen.focus ?? '')} profile={profile} update={update} missionId={screen.missionId} focus={screen.focus} onExit={() => go({ name: 'village' })} onRush={(s) => go({ name: 'rush', focus: s })} />
+    case 'rush':
+      return <Rush key={`${screen.focus}-${screen.n ?? 0}`} profile={profile} update={update} focus={screen.focus} onExit={() => go({ name: 'village' })} onAgain={() => go({ name: 'rush', focus: screen.focus, n: Date.now() })} />
     case 'map':
       return <MapScreen profile={profile} onBack={() => go({ name: 'village' })} onPlay={(skill) => go({ name: 'mission', missionId: MISSIONS[Math.floor(Math.random() * MISSIONS.length)].id, focus: skill })} />
     default:

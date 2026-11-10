@@ -1,35 +1,28 @@
-// Générateur d'exercices : des variantes infinies pour chaque chapitre,
-// avec des distracteurs qui correspondent à de vraies erreurs d'enfants.
+// Générateur d'exercices de livrets : variantes infinies, distracteurs tirés
+// des vraies erreurs d'enfants, explications et astuces par livret.
 
-import { Time, digital, spoken, fromTotal, toTotal, handAngles, angleDiff, digital24 } from './clock'
-import { SkillId } from './skills'
+import { SKILL_BY_ID, SkillId, MAX_FACTOR } from './skills'
 
 export type Rng = () => number
 
 export type ExerciseKind =
-  | 'tapHand' // toucher la bonne aiguille
-  | 'handRole' // à quoi sert cette aiguille ?
-  | 'minutesChoice' // combien de minutes ?
-  | 'readChoice' // lire l'horloge, choisir l'heure
-  | 'matchSpoken' // lire l'horloge, choisir l'expression orale
-  | 'pickClock' // choisir la bonne horloge
-  | 'setClock' // régler l'horloge
-  | 'fixClock' // corriger une horloge fausse
+  | 'choice' // a × b = ? parmi 4 réponses
+  | 'type' // a × b = ? je tape
+  | 'missing' // a × ? = c, je tape
+  | 'trueFalse' // a × b = c, vrai ou faux ?
+  | 'array' // quadrillage de cubes : combien ?
 
 /** Types d'erreurs suivis par le moteur adaptatif. */
 export type ErrorType =
-  | 'aiguilles' // confond petite et grande aiguille
-  | 'heureSuivante' // lit l'heure suivante trop tôt (8 h 45 lue 9 h 45)
-  | 'heurePrecedente' // lit l'heure d'avant
-  | 'minutesNombre' // lit le nombre comme des minutes (sur le 9 → 9 min)
-  | 'minutes' // minutes fausses
-  | 'heure' // heure fausse
-  | 'expression' // confusion et quart / moins le quart…
+  | 'voisin' // résultat d'à côté dans le livret (7 × 8 → 49 ou 63)
+  | 'addition' // a additionné au lieu de multiplier (7 × 8 → 15)
+  | 'chiffres' // chiffres inversés (56 → 65)
+  | 'calcul' // petite erreur de calcul
+  | 'autre'
 
 export interface Choice {
   label: string
-  /** Heure représentée (pour pickClock et lecture). */
-  time?: Time
+  value: number | boolean
   correct: boolean
   error?: ErrorType
 }
@@ -38,23 +31,21 @@ export interface Exercise {
   id: string
   skill: SkillId
   kind: ExerciseKind
+  /** Le livret travaillé. */
+  table: number
+  /** Les deux facteurs, dans l'ordre d'affichage. */
+  a: number
+  b: number
+  product: number
+  /** Réponse attendue (produit, facteur manquant, ou vrai/faux). */
+  answer: number | boolean
+  /** Résultat proposé pour vrai/faux. */
+  claimed?: number
   prompt: string
-  /** Petite phrase de contexte (missions, vie quotidienne). */
-  context?: string
-  target: Time
   choices?: Choice[]
-  /** Horloge de départ (setClock / fixClock). */
-  start?: Time
-  /** Aiguille à toucher (tapHand). */
-  hand?: 'hour' | 'minute'
-  /** Pas de réglage des minutes. */
-  snap: 1 | 5
-  /** Les nombres de 1 à 60 sont-ils écrits autour du cadran (aide) ? */
-  showMinuteLabels: boolean
 }
 
 const pick = <T,>(rng: Rng, arr: T[]): T => arr[Math.floor(rng() * arr.length)]
-const int = (rng: Rng, a: number, b: number) => a + Math.floor(rng() * (b - a + 1))
 const shuffle = <T,>(rng: Rng, arr: T[]): T[] => {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -66,240 +57,201 @@ const shuffle = <T,>(rng: Rng, arr: T[]): T[] => {
 let seq = 0
 const uid = () => `ex${Date.now().toString(36)}${(seq++).toString(36)}`
 
-/** Une heure typique du chapitre. */
-export function timeForSkill(skill: SkillId, rng: Rng): Time {
-  const h = int(rng, 1, 12)
-  switch (skill) {
-    case 'aiguilles':
-    case 'heures':
-      return { h, m: 0 }
-    case 'minutes':
-    case 'cinq':
-    case 'regler':
-      return { h, m: int(rng, 0, 11) * 5 }
-    case 'demi':
-      return { h, m: rng() < 0.75 ? 30 : 0 }
-    case 'quart':
-      return { h, m: rng() < 0.7 ? 15 : pick(rng, [0, 30]) }
-    case 'moinsquart':
-      return { h, m: rng() < 0.7 ? 45 : pick(rng, [15, 30]) }
-    case 'toutes': {
-      let m = int(rng, 1, 58)
-      if (m % 5 === 0) m += 1 + int(rng, 0, 3)
-      return { h, m: m % 60 }
-    }
-    case 'moins':
-      return { h, m: rng() < 0.85 ? int(rng, 7, 11) * 5 : int(rng, 36, 58) }
-    case 'quotidien':
-      return { h, m: int(rng, 0, 11) * 5 }
-    case 'defi':
-      return { h, m: rng() < 0.5 ? int(rng, 0, 11) * 5 : int(rng, 0, 59) }
+/** Clé d'un calcul, indépendante de l'ordre : « 7x8 ». */
+export const factKey = (a: number, b: number) => (a <= b ? `${a}x${b}` : `${b}x${a}`)
+
+/** Poids optionnel par calcul (les calculs ratés reviennent plus souvent). */
+export type FactWeight = (table: number, n: number) => number
+
+export function pickFact(skill: SkillId, rng: Rng, weight?: FactWeight): { table: number; n: number } {
+  const tables = SKILL_BY_ID[skill].tables
+  const all: { table: number; n: number; w: number }[] = []
+  for (const t of tables) for (let n = 1; n <= MAX_FACTOR; n++) {
+    // fois 1 et fois 10 sont faciles : moins souvent, sauf dans leur propre chapitre
+    let w = skill !== 'x1x10' && (n === 1 || n === 10) ? 0.35 : 1
+    if (weight) w *= weight(t, n)
+    all.push({ table: t, n, w })
   }
+  let r = rng() * all.reduce((s, x) => s + x.w, 0)
+  for (const x of all) { r -= x.w; if (r <= 0) return x }
+  return all[all.length - 1]
 }
 
-/** Erreurs classiques pour une heure donnée → distracteurs crédibles. */
-export function typicalMistakes(t: Time): { time: Time; error: ErrorType }[] {
-  const out: { time: Time; error: ErrorType }[] = []
-  const nextH = (t.h % 12) + 1
-  const prevH = t.h === 1 ? 12 : t.h - 1
-  // Aiguilles inversées : on lit la grande comme l'heure, la petite comme les minutes.
-  const swappedH = t.m === 0 ? 12 : Math.max(1, Math.round(t.m / 5))
-  const swappedM = (t.h % 12) * 5
-  if (!(swappedH === t.h && swappedM === t.m)) out.push({ time: { h: swappedH, m: swappedM }, error: 'aiguilles' })
-  // Heure suivante (très fréquent après la demie).
-  if (t.m >= 30) out.push({ time: { h: nextH, m: t.m }, error: 'heureSuivante' })
-  else if (t.m > 0) out.push({ time: { h: prevH, m: t.m }, error: 'heurePrecedente' })
-  // Nombre lu comme minutes : grande aiguille sur le 9 → « 9 minutes ».
-  if (t.m % 5 === 0 && t.m > 0 && t.m / 5 !== t.m) out.push({ time: { h: t.h, m: t.m / 5 }, error: 'minutesNombre' })
-  // Confusion d'expression : et quart ↔ moins le quart.
-  if (t.m === 15) out.push({ time: { h: t.h, m: 45 }, error: 'expression' })
-  if (t.m === 45) out.push({ time: { h: t.h, m: 15 }, error: 'expression' })
+/** Réponses fausses typiques pour a × b, avec leur type d'erreur. */
+export function typicalMistakes(table: number, n: number): { value: number; error: ErrorType }[] {
+  const p = table * n
+  const out: { value: number; error: ErrorType }[] = []
+  const add = (value: number, error: ErrorType) => {
+    if (value > 0 && value !== p && !out.some((o) => o.value === value)) out.push({ value, error })
+  }
+  if (n < MAX_FACTOR) add(table * (n + 1), 'voisin')
+  if (n > 1) add(table * (n - 1), 'voisin')
+  if (table > 1) add((table - 1) * n, 'voisin')
+  add((table + 1) * n, 'voisin')
+  add(table + n, 'addition')
+  if (p >= 10 && p < 100) {
+    const rev = Number(String(p).split('').reverse().join(''))
+    if (rev % 10 !== 0 || p % 10 !== 0) add(rev, 'chiffres')
+  }
+  add(p + 1, 'calcul'); add(p - 1, 'calcul'); add(p + 2, 'calcul'); add(p - 2, 'calcul'); add(p + 10, 'calcul'); add(p - 10, 'calcul')
   return out
 }
 
-function uniqueByTime(list: { time: Time; error?: ErrorType }[], target: Time) {
-  const seen = new Set([toTotal(target)])
-  return list.filter((x) => {
-    const k = toTotal(x.time)
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  })
+/** Classe une réponse tapée. */
+export function classify(table: number, n: number, value: number): ErrorType {
+  const m = typicalMistakes(table, n).find((x) => x.value === value)
+  return m ? m.error : 'autre'
 }
 
-function timeChoices(t: Time, rng: Rng, count: number, fmt: (t: Time) => string): Choice[] {
-  const mistakes = uniqueByTime(typicalMistakes(t), t)
-  const fill: { time: Time; error?: ErrorType }[] = []
-  // Compléter avec des heures proches.
-  const deltas = shuffle(rng, [-60, 60, -5, 5, -15, 15, 30, -30, 120])
-  for (const d of deltas) fill.push({ time: fromTotal(toTotal(t) + d), error: Math.abs(d) >= 60 ? 'heure' : 'minutes' })
-  const distractors = uniqueByTime([...shuffle(rng, mistakes), ...fill], t).slice(0, count - 1)
+function numberChoices(rng: Rng, table: number, n: number): Choice[] {
+  const p = table * n
+  const mistakes = typicalMistakes(table, n)
+  const byType = (e: ErrorType) => mistakes.filter((m) => m.error === e)
+  // Un « voisin », puis un mélange des autres erreurs crédibles.
+  const pool = [...shuffle(rng, byType('voisin')).slice(0, 2), ...shuffle(rng, [...byType('addition'), ...byType('chiffres'), ...byType('calcul')])]
+  const chosen: typeof mistakes = []
+  for (const m of pool) if (chosen.length < 3 && !chosen.some((c) => c.value === m.value)) chosen.push(m)
   return shuffle(rng, [
-    { label: fmt(t), time: t, correct: true },
-    ...distractors.map((d) => ({ label: fmt(d.time), time: d.time, correct: false, error: d.error })),
+    { label: String(p), value: p, correct: true },
+    ...chosen.map((m) => ({ label: String(m.value), value: m.value, correct: false, error: m.error })),
   ])
 }
 
-const DAILY: { text: (t: string) => string; pm: boolean }[] = [
-  { text: (t) => `Le goûter des chats est servi à ${t}.`, pm: true },
-  { text: (t) => `Le train du port part à ${t}.`, pm: true },
-  { text: (t) => `Le marché ouvre à ${t}.`, pm: false },
-  { text: (t) => `Le cours de danse commence à ${t}.`, pm: true },
-  { text: (t) => `Le bateau des étoiles arrive à ${t}.`, pm: true },
-  { text: (t) => `Le petit-déjeuner est à ${t}.`, pm: false },
-]
+const KINDS: Record<SkillId, ExerciseKind[]> = {
+  x1x10: ['choice', 'choice', 'type', 'trueFalse'],
+  x2: ['choice', 'array', 'type', 'type', 'missing'],
+  x5: ['choice', 'array', 'type', 'type', 'missing'],
+  x3: ['choice', 'array', 'type', 'type', 'missing', 'trueFalse'],
+  x4: ['choice', 'array', 'type', 'type', 'missing', 'trueFalse'],
+  x9: ['choice', 'type', 'type', 'missing', 'trueFalse'],
+  x6: ['choice', 'array', 'type', 'type', 'missing', 'trueFalse'],
+  x11: ['choice', 'type', 'type', 'missing'],
+  x7: ['choice', 'array', 'type', 'type', 'missing', 'trueFalse'],
+  x8: ['choice', 'array', 'type', 'type', 'missing', 'trueFalse'],
+  x12: ['choice', 'type', 'type', 'missing', 'trueFalse'],
+  defi: ['type', 'type', 'missing', 'choice', 'trueFalse'],
+}
 
-/** Fabrique un exercice pour un chapitre. `kind` peut être imposé. */
-export function generate(skill: SkillId, rng: Rng = Math.random, kind?: ExerciseKind): Exercise {
-  const t = timeForSkill(skill, rng)
-  const early = skill === 'aiguilles' || skill === 'heures' || skill === 'minutes'
-  const snap: 1 | 5 = skill === 'toutes' || skill === 'defi' || (skill === 'moins' && t.m % 5 !== 0) ? 1 : 5
-  const base = { id: uid(), skill, target: t, snap, showMinuteLabels: early }
-
-  const kinds: Record<SkillId, ExerciseKind[]> = {
-    aiguilles: ['tapHand', 'tapHand', 'handRole'],
-    heures: ['readChoice', 'setClock', 'pickClock'],
-    minutes: ['minutesChoice', 'minutesChoice', 'setClock'],
-    demi: ['readChoice', 'matchSpoken', 'setClock', 'pickClock'],
-    quart: ['readChoice', 'matchSpoken', 'setClock', 'pickClock'],
-    moinsquart: ['matchSpoken', 'readChoice', 'setClock', 'pickClock', 'fixClock'],
-    cinq: ['readChoice', 'setClock', 'pickClock', 'fixClock'],
-    toutes: ['readChoice', 'setClock', 'pickClock'],
-    moins: ['matchSpoken', 'readChoice', 'setClock'],
-    regler: ['setClock', 'fixClock', 'setClock'],
-    quotidien: ['setClock', 'pickClock', 'readChoice'],
-    defi: ['readChoice', 'matchSpoken', 'setClock', 'pickClock', 'fixClock'],
-  }
-  const k = kind ?? pick(rng, kinds[skill])
-
-  // Vie quotidienne : phrase avec un horaire 24 h.
-  let context: string | undefined
-  if (skill === 'quotidien') {
-    const s = pick(rng, DAILY)
-    context = s.text(digital24(t, s.pm))
-  }
+/** Fabrique un exercice. `kind` peut être imposé, `weight` oriente vers les calculs fragiles. */
+export function generate(skill: SkillId, rng: Rng = Math.random, kind?: ExerciseKind, weight?: FactWeight): Exercise {
+  let k = kind ?? pick(rng, KINDS[skill])
+  const { table, n } = pickFact(skill, rng, weight)
+  // Quadrillage : on garde des tailles qu'on peut regarder (pas 12 × 12 cubes).
+  if (k === 'array' && table * n > 60) k = 'choice'
+  const swap = rng() < 0.5
+  const a = swap ? n : table
+  const b = swap ? table : n
+  const p = table * n
+  const base = { id: uid(), skill, table, a, b, product: p }
 
   switch (k) {
-    case 'tapHand': {
-      const hand = rng() < 0.5 ? 'hour' : 'minute'
-      const tt = { h: t.h, m: pick(rng, [10, 20, 40, 50]) }
-      return { ...base, kind: k, target: tt, hand, prompt: hand === 'hour' ? 'Touche l’aiguille des heures.' : 'Touche l’aiguille des minutes.' }
+    case 'choice':
+      return { ...base, kind: k, answer: p, prompt: `${a} × ${b} = ?`, choices: numberChoices(rng, table, n) }
+    case 'array':
+      return { ...base, kind: k, answer: p, prompt: `${a} rangées de ${b} cubes. Combien en tout ?`, choices: numberChoices(rng, table, n) }
+    case 'type':
+      return { ...base, kind: k, answer: p, prompt: `${a} × ${b} = ?` }
+    case 'missing': {
+      // On cache l'autre facteur que le livret : 7 × ? = 56 pour le livret 7.
+      return { ...base, kind: k, a: table, b: n, answer: n, prompt: `${table} × ? = ${p}` }
     }
-    case 'handRole': {
-      const big = rng() < 0.5
+    case 'trueFalse': {
+      const isTrue = rng() < 0.45
+      const wrong = typicalMistakes(table, n)
+      const m = isTrue || !wrong.length ? null : pick(rng, wrong.filter((w) => w.error !== 'addition').length ? wrong.filter((w) => w.error !== 'addition') : wrong)
+      const claimed = m ? m.value : p
       return {
-        ...base, kind: k, target: { h: t.h, m: 20 },
-        prompt: big ? 'La grande aiguille montre…' : 'La petite aiguille montre…',
-        choices: shuffle(rng, [
-          { label: 'les minutes', correct: big, error: big ? undefined : 'aiguilles' },
-          { label: 'les heures', correct: !big, error: big ? 'aiguilles' : undefined },
-        ]),
+        ...base, kind: k, answer: isTrue || !m, claimed,
+        prompt: `${a} × ${b} = ${claimed}`,
+        choices: [
+          { label: 'Vrai', value: true, correct: isTrue || !m, error: m ? m.error : undefined },
+          { label: 'Faux', value: false, correct: !(isTrue || !m), error: m ? undefined : 'autre' },
+        ],
       }
     }
-    case 'minutesChoice': {
-      const m = t.m === 0 ? 5 * int(rng, 1, 11) : t.m
-      const tt = { h: t.h, m }
-      const opts = new Map<number, Choice>()
-      opts.set(m, { label: `${m} minutes`, correct: true })
-      const add = (v: number, e: ErrorType) => { if (v >= 0 && v < 60 && !opts.has(v)) opts.set(v, { label: `${v} minutes`, correct: false, error: e }) }
-      add(m / 5, 'minutesNombre')
-      add(m + 5, 'minutes'); add(m - 5, 'minutes'); add(m + 10, 'minutes'); add((m + 30) % 60, 'minutes')
-      return { ...base, kind: k, target: tt, prompt: 'Combien de minutes montre la grande aiguille ?', choices: shuffle(rng, [...opts.values()].slice(0, 4)) }
-    }
-    case 'readChoice':
-      return { ...base, kind: k, context, prompt: 'Quelle heure est-il ?', choices: timeChoices(t, rng, 4, digital) }
-    case 'matchSpoken':
-      return { ...base, kind: k, context, prompt: 'Comment dit-on cette heure ?', choices: timeChoices(t, rng, 4, spoken) }
-    case 'pickClock':
-      return { ...base, kind: k, context, prompt: context ? 'Quelle horloge montre cette heure ?' : `Trouve l’horloge qui montre ${rng() < 0.5 ? digital(t) : spoken(t)}.`, choices: timeChoices(t, rng, 3, digital) }
-    case 'setClock': {
-      const start = fromTotal(toTotal(t) + pick(rng, [-200, -95, 140, 260, 330]))
-      return { ...base, kind: k, context, start, prompt: `Règle l’horloge sur ${rng() < 0.6 || early ? digital(t) : spoken(t)}.` }
-    }
-    case 'fixClock': {
-      const wrong = typicalMistakes(t)
-      const start = wrong.length ? pick(rng, wrong).time : fromTotal(toTotal(t) + 60)
-      return { ...base, kind: k, context, start, prompt: `Oups, l’horloge du chat est fausse ! Corrige-la : ${digital(t)}.` }
-    }
   }
 }
 
-/** Analyse d'une horloge réglée par l'enfant. */
-export function checkSetClock(target: Time, given: Time): { correct: boolean; error?: ErrorType } {
-  // Exactitude demandée : la minute juste et la petite aiguille sur la bonne heure.
-  const minuteOk = target.m === given.m
-  const hourOk = Math.abs(angleDiff(handAngles(given).hour, handAngles(target).hour)) < 7.5
-  if (minuteOk && hourOk) return { correct: true }
-  if (!minuteOk) {
-    // Aiguilles inversées ?
-    const swapped = Math.abs(angleDiff(handAngles(given).minute, handAngles(target).hour)) <= 30 &&
-      Math.abs(angleDiff(handAngles(given).hour, handAngles(target).minute)) <= 30
-    if (swapped && target.m !== 0) return { correct: false, error: 'aiguilles' }
+/** Vérifie une réponse tapée (produit ou facteur manquant). */
+export function checkTyped(ex: Exercise, value: number): { correct: boolean; error?: ErrorType } {
+  if (value === ex.answer) return { correct: true }
+  if (ex.kind === 'missing') {
+    // 7 × ? = 56 : répondre 49 ou 63 trahit une confusion avec le produit.
+    return { correct: false, error: Math.abs(value - (ex.answer as number)) <= 1 ? 'voisin' : 'calcul' }
   }
-  if (minuteOk && !hourOk) {
-    if (given.h === (target.h % 12) + 1) return { correct: false, error: 'heureSuivante' }
-    if (target.h === (given.h % 12) + 1) return { correct: false, error: 'heurePrecedente' }
-    return { correct: false, error: 'heure' }
-  }
-  if (target.m % 5 === 0 && given.m === target.m / 5) return { correct: false, error: 'minutesNombre' }
-  return { correct: false, error: 'minutes' }
+  return { correct: false, error: classify(ex.table, ex.b === ex.table ? ex.a : ex.b, value) }
 }
 
-/** Explication courte et bienveillante d'une erreur. */
+/** Astuce propre au livret. */
+export function strategy(table: number, n: number): string {
+  const p = table * n
+  switch (table) {
+    case 1: return `Fois 1, le nombre ne change pas : ${n} × 1 = ${n}.`
+    case 10: return `Fois 10, on ajoute un zéro : ${n} × 10 = ${p}.`
+    case 2: return `Fois 2, c’est le double : ${n} + ${n} = ${p}.`
+    case 3: return `Le double, plus encore une fois : ${n * 2} + ${n} = ${p}.`
+    case 4: return `Le double du double : ${n * 2}, puis ${p}.`
+    case 5: return `La moitié de fois 10 : ${n * 10}, la moitié fait ${p}.`
+    case 6: return `Fois 5, plus encore une fois : ${n * 5} + ${n} = ${p}.`
+    case 7: return `Fois 5, plus fois 2 : ${n * 5} + ${n * 2} = ${p}.`
+    case 8: return `Le double, trois fois de suite : ${n * 2}, ${n * 4}, ${p}.`
+    case 9: return `Fois 10, moins une fois : ${n * 10} − ${n} = ${p}.`
+    case 11: return n <= 9 ? `On répète le chiffre : ${n} × 11 = ${p}.` : `Fois 10, plus une fois : ${n * 10} + ${n} = ${p}.`
+    case 12: return `Fois 10, plus fois 2 : ${n * 10} + ${n * 2} = ${p}.`
+    default: return `${table} × ${n} = ${p}.`
+  }
+}
+
+const otherFactor = (ex: Exercise) => (ex.a === ex.table ? ex.b : ex.a)
+
+/** Indice avant de répondre (sans donner le résultat). */
+export function hint(ex: Exercise): string {
+  const n = otherFactor(ex)
+  const t = ex.table
+  if (ex.kind === 'missing') return `Récite le livret de ${t} : ${t}, ${t * 2}, ${t * 3}… et compte combien de fois tu avances jusqu’à ${ex.product}.`
+  if (ex.kind === 'array') return `Compte les rangées de ${ex.b} : ${ex.b}, ${ex.b * 2}, ${ex.b * 3}…`
+  switch (t) {
+    case 2: return 'Fois 2, c’est le double.'
+    case 3: return `Fais le double de ${n}, puis ajoute encore ${n}.`
+    case 4: return `Fais le double de ${n}, puis encore le double.`
+    case 5: return `Calcule ${n} × 10, puis prends la moitié.`
+    case 6: return `Calcule ${n} × 5, puis ajoute ${n}.`
+    case 7: return `Calcule ${n} × 5 et ${n} × 2, puis additionne.`
+    case 8: return `Double ${n} trois fois de suite.`
+    case 9: return `Calcule ${n} × 10, puis enlève ${n}.`
+    case 11: return n <= 9 ? 'Jusqu’à 9 × 11, on répète le chiffre.' : `Calcule ${n} × 10, puis ajoute ${n}.`
+    case 12: return `Calcule ${n} × 10 et ${n} × 2, puis additionne.`
+    case 10: return 'Fois 10, on ajoute un zéro.'
+    default: return 'Fois 1, le nombre ne change pas.'
+  }
+}
+
 /**
- * Explication courte et bienveillante d'une erreur.
- * reveal = false : on explique sans donner la réponse, pour laisser un nouvel essai.
+ * Explication bienveillante d'une erreur.
+ * reveal = false : on explique sans donner la réponse, pour un nouvel essai.
  */
-export function explain(error: ErrorType | undefined, target: Time, reveal = true): string {
-  const t = digital(target)
+export function explain(error: ErrorType | undefined, ex: Exercise, reveal = true): string {
+  const t = ex.table
+  const n = otherFactor(ex)
+  const p = ex.product
+  if (ex.kind === 'missing') {
+    return reveal ? `${t} × ${n} = ${p}, donc le nombre caché est ${n}.` : `Récite le livret de ${t} jusqu’à ${p}, en comptant sur tes doigts.`
+  }
+  if (ex.kind === 'trueFalse' && reveal) {
+    return ex.answer ? `C’était vrai : ${ex.a} × ${ex.b} = ${p}.` : `C’était faux : ${ex.a} × ${ex.b} = ${p}, pas ${ex.claimed}.`
+  }
   if (!reveal) {
     switch (error) {
-      case 'aiguilles': return 'Attention : la petite aiguille montre les heures, la grande montre les minutes.'
-      case 'heureSuivante': return 'La petite aiguille n’a pas encore atteint l’heure suivante. Regarde le nombre qu’elle vient de dépasser.'
-      case 'heurePrecedente': return 'La petite aiguille a déjà dépassé un nombre : c’est lui, l’heure.'
-      case 'minutesNombre': return 'Le nombre sous la grande aiguille n’est pas les minutes : compte de 5 en 5 !'
-      case 'expression': return '« Et quart » = grande aiguille sur le 3. « Moins le quart » = grande aiguille sur le 9.'
-      case 'minutes': return 'Regarde bien la grande aiguille et compte de 5 en 5.'
-      case 'heure': return 'Regarde bien la petite aiguille : c’est elle qui montre l’heure.'
-      default: return 'Regarde bien les deux aiguilles.'
+      case 'voisin': return 'Tu es tout près : c’est le résultat juste à côté dans le livret.'
+      case 'addition': return 'Attention, c’est une multiplication, pas une addition !'
+      case 'chiffres': return 'Les bons chiffres, mais dans le mauvais ordre.'
+      default: return hint(ex)
     }
   }
   switch (error) {
-    case 'aiguilles':
-      return `La petite aiguille montre les heures, la grande montre les minutes. Ici, il est ${t}.`
-    case 'heureSuivante':
-      return `La petite aiguille n’a pas encore atteint le ${(target.h % 12) + 1}. L’heure est donc encore ${target.h} : ${t}.`
-    case 'heurePrecedente':
-      return `La petite aiguille a déjà dépassé le ${target.h}. C’est donc ${target.h} h : ${t}.`
-    case 'minutesNombre':
-      return `Grande aiguille sur le ${target.m / 5} : ${target.m / 5} × 5 = ${target.m} minutes. Il est ${t}.`
-    case 'expression':
-      return target.m === 15
-        ? `« Et quart », c’est 15 minutes après l’heure : grande aiguille sur le 3.`
-        : `« Moins le quart », c’est 15 minutes avant l’heure suivante : grande aiguille sur le 9.`
-    case 'minutes':
-      return `Compte de 5 en 5 jusqu’à la grande aiguille. Il est ${t}.`
-    case 'heure':
-      return `La petite aiguille montre l’heure. Il est ${t}.`
-    default:
-      return `La bonne réponse est ${t}.`
-  }
-}
-
-/** Petit indice avant de répondre. */
-export function hint(ex: Exercise): string {
-  const { h, m } = ex.target
-  switch (ex.kind) {
-    case 'tapHand':
-    case 'handRole':
-      return 'La petite aiguille est courte et épaisse : elle montre les heures.'
-    case 'minutesChoice':
-      return `Compte de 5 en 5 jusqu’à la grande aiguille : 5, 10, 15…`
-    default:
-      if (m === 0) return 'La grande aiguille est sur le 12 : c’est une heure pile.'
-      if (m === 30) return 'Grande aiguille sur le 6 : c’est « et demie ».'
-      if (m === 15) return 'Grande aiguille sur le 3 : c’est « et quart ».'
-      if (m === 45) return `Grande aiguille sur le 9 : il manque 15 minutes pour ${(h % 12) + 1} h.`
-      return 'Commence par la grande aiguille (minutes), puis regarde où est la petite.'
+    case 'voisin': return `Presque ! ${strategy(t, n)}`
+    case 'addition': return `C’est une multiplication : ${n} fois ${t}. ${strategy(t, n)}`
+    case 'chiffres': return `Les chiffres étaient inversés : la réponse est ${p}.`
+    default: return strategy(t, n)
   }
 }

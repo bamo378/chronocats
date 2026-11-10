@@ -1,27 +1,23 @@
 import { useMemo, useState } from 'react'
 import { ParentSettings, PROFILES, ProfileId, loadProfile, saveProfile, hashPin, Profile } from '../profiles/store'
-import { stats, isDue, newSkillState } from '../engine/learner'
+import { stats, isDue, newSkillState, hardestFacts, newLearner } from '../engine/learner'
 import { SKILLS, SkillId, SKILL_BY_ID } from '../engine/skills'
 import { ErrorType } from '../engine/exercises'
 
 const ERR_LABEL: Record<ErrorType, string> = {
-  aiguilles: 'Confond la petite et la grande aiguille',
-  heureSuivante: 'Lit l’heure suivante trop tôt (ex. 8 h 45 lue 9 h 45)',
-  heurePrecedente: 'Lit l’heure précédente',
-  minutesNombre: 'Lit le nombre au lieu des minutes (sur le 9 → « 9 min »)',
-  minutes: 'Erreurs sur les minutes',
-  heure: 'Erreurs sur l’heure',
-  expression: 'Confond « et quart » et « moins le quart »',
+  voisin: 'Donne le résultat d’à côté dans le livret (7 × 8 → 49 ou 63)',
+  addition: 'Additionne au lieu de multiplier (7 × 8 → 15)',
+  chiffres: 'Inverse les chiffres (56 → 65)',
+  calcul: 'Petites erreurs de calcul (à 1 ou 2 près)',
+  autre: 'Autres erreurs',
 }
 
 const ERR_TIP: Record<ErrorType, string> = {
-  aiguilles: 'Montrer une vraie montre : « la petite est paresseuse, elle avance lentement — ce sont les heures ».',
-  heureSuivante: 'À la maison, demander « quel nombre la petite aiguille vient-elle de dépasser ? ».',
-  heurePrecedente: 'Faire remarquer que la petite aiguille glisse entre deux nombres.',
-  minutesNombre: 'Compter ensemble de 5 en 5 autour du cadran.',
-  minutes: 'Compter de 5 en 5, puis les petits traits.',
-  heure: 'Repérer d’abord la petite aiguille avant la grande.',
-  expression: 'Associer « quart » au 3 et « moins le quart » au 9.',
+  voisin: 'Réciter le livret à voix haute en comptant sur les doigts, puis repartir d’un calcul connu (7 × 7 = 49, donc 7 × 8 = 49 + 7).',
+  addition: 'Revoir le sens : 4 × 3, c’est 4 paquets de 3 (des Lego, des bonbons…).',
+  chiffres: 'Faire dire le résultat à voix haute avant de l’écrire.',
+  calcul: 'Utiliser les astuces : × 9 = × 10 moins une fois, × 4 = le double du double.',
+  autre: 'Reprendre le livret avec la mini-leçon et sans chrono.',
 }
 
 export function Parent({ settings, updateSettings, onExit }: { settings: ParentSettings; updateSettings: (fn: (s: ParentSettings) => void) => void; onExit: () => void }) {
@@ -71,11 +67,12 @@ function Dashboard({ settings, updateSettings, onExit }: { settings: ParentSetti
   const [tick, setTick] = useState(0)
   const p = useMemo(() => loadProfile(who), [who, tick])
   const s7 = stats(p.learner, 7)
+  const hard = hardestFacts(p.learner)
   const s30 = stats(p.learner, 30)
   const now = Date.now()
   const masteredList = SKILLS.filter((s) => p.learner.skills[s.id].mastered)
   const inProgress = SKILLS.filter((s) => !p.learner.skills[s.id].mastered && p.learner.skills[s.id].attempts > 0)
-  const [resetSkill, setResetSkill] = useState<SkillId>('aiguilles')
+  const [resetSkill, setResetSkill] = useState<SkillId>('x1x10')
 
   const days7 = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(now - (6 - i) * 86400000)
@@ -96,15 +93,15 @@ function Dashboard({ settings, updateSettings, onExit }: { settings: ParentSetti
   function redoDiagnostic() {
     if (!confirm(`Refaire le diagnostic de ${p.name} à la prochaine connexion ? La ville est conservée.`)) return
     const n = structuredClone(p)
-    n.learner.diagnosticDone = false
-    for (const s of SKILLS) n.learner.skills[s.id] = newSkillState()
+    n.learner = newLearner()
     save(n)
   }
 
   const recs: string[] = []
   for (const [e] of s30.errors.slice(0, 2)) recs.push(ERR_TIP[e])
   if (s7.minutes < 20) recs.push('Quelques séances courtes (10–15 min) dans la semaine suffisent : la régularité compte plus que la durée.')
-  if (s7.accuracy > 0.9 && s7.answers > 20) recs.push('Très bonne précision : elle est prête pour les chapitres suivants.')
+  if (hard.length) recs.push(`À revoir en priorité : ${hard.slice(0, 3).map((h) => h.fact.replace('x', ' × ')).join(', ')}. Le jeu les repropose automatiquement plus souvent.`)
+  if (s7.accuracy > 0.9 && s7.answers > 20) recs.push('Très bonne précision : elle est prête pour les livrets suivants.')
   if (!recs.length) recs.push('Pas encore assez de données : laissez-la jouer quelques missions.')
 
   return (
@@ -160,6 +157,10 @@ function Dashboard({ settings, updateSettings, onExit }: { settings: ParentSetti
             {s30.errors.length ? (
               <ul className="err-list">{s30.errors.map(([e, n]) => <li key={e}><span>{ERR_LABEL[e]}</span><b>{n}</b></li>)}</ul>
             ) : <p className="muted">Aucune erreur récurrente.</p>}
+            <h3>Calculs les plus difficiles</h3>
+            {hard.length ? (
+              <div className="hard-facts">{hard.map((h) => <span key={h.fact} className="hf">{h.fact.replace('x', ' × ')} <small>{h.ko} erreur{h.ko > 1 ? 's' : ''}</small></span>)}</div>
+            ) : <p className="muted">Aucun pour l’instant.</p>}
             <h3>Recommandations</h3>
             <ul className="recs">{recs.map((r) => <li key={r}>{r}</li>)}</ul>
           </div>

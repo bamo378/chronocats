@@ -44,8 +44,8 @@ export function Diagnostic({ profile, update, onDone }: { profile: Profile; upda
         <div className="panel story-panel">
           <Cat coat={cat.coat} accessory={cat.accessory} mood="wow" size={170} />
           <h1>Le Grand Réveil</h1>
-          <p className="lead">Oh non ! Les horloges de l’Archipel des Douze Heures se sont arrêtées.</p>
-          <p className="lead">{cat.name} a besoin de toi pour rallumer les cristaux du temps. Montre-lui ce que tu sais déjà !</p>
+          <p className="lead">Oh non ! Les cristaux de l’Archipel des Douze se sont éteints.</p>
+          <p className="lead">Chaque livret que tu connais en rallume un. Montre à {cat.name} ce que tu sais déjà !</p>
           <p className="small-note">Ce n’est pas une interro : réponds comme tu peux, ça aide {cat.name} à préparer ton aventure.</p>
           <button className="btn btn-primary big" onClick={() => setPhase('play')}>Allumer les cristaux ✨</button>
         </div>
@@ -59,8 +59,8 @@ export function Diagnostic({ profile, update, onDone }: { profile: Profile; upda
         <div className="panel story-panel">
           <Cat coat={cat.coat} accessory={cat.accessory} mood="cheer" size={170} className="jump" />
           <h1>Merci, {profile.name} !</h1>
-          <p className="lead">{diag.current.passed.length} cristaux rallumés sur {crystals}.</p>
-          <p className="lead">Ton aventure commence au chapitre {SKILL_BY_ID[start].chapter} : <b>{SKILL_BY_ID[start].title}</b>.</p>
+          <p className="lead">{diag.current.passed.length} {diag.current.passed.length > 1 ? 'cristaux rallumés' : 'cristal rallumé'} sur {crystals}.</p>
+          <p className="lead">On commence par <b>{SKILL_BY_ID[start].title}</b>. Tu pourras aussi choisir n’importe quel livret sur la carte.</p>
           <div className="reward-row"><span className="pill">🪙 +30 pièces de bienvenue</span></div>
           <button className="btn btn-primary big" onClick={onDone}>Découvrir mon île 🏝️</button>
         </div>
@@ -73,7 +73,7 @@ export function Diagnostic({ profile, update, onDone }: { profile: Profile; upda
       <div className="play-top">
         <div className="crystals">
           {LADDER.map((r, i) => (
-            <span key={r.skill} className={`crystal ${i < diag.current.passed.length ? 'lit' : ''}`} title={SKILL_BY_ID[r.skill].short}>◆</span>
+            <span key={r} className={`crystal ${i < diag.current.passed.length ? 'lit' : ''}`} title={SKILL_BY_ID[r].short}>◆</span>
           ))}
         </div>
         <div className="progress"><i style={{ width: `${diagProgress(diag.current) * 100}%` }} /></div>

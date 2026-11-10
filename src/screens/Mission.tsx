@@ -11,8 +11,10 @@ import { Scene } from '../components/Scene'
 import { Lesson } from '../components/Lesson'
 import { ITEMS, ACCESSORIES, COATS, COAT_UNLOCK } from '../game/catalog'
 import { sfx } from '../audio/sound'
+import { fx } from '../components/Fx'
 
 interface Props {
+  onRush?: (s: SkillId) => void
   profile: Profile
   update: UpdateProfile
   missionId: string
@@ -22,15 +24,16 @@ interface Props {
 
 interface Gains { coins: number; cubes: number; firstTry: number; persevere: number; mastered: SkillId[]; reviewsOk: number }
 
-export function MissionScreen({ profile, update, missionId, focus, onExit }: Props) {
+export function MissionScreen({ profile, update, missionId, focus, onExit, onRush }: Props) {
   const mission = MISSIONS.find((m) => m.id === missionId) ?? MISSIONS[0]
-  const [list] = useState<Exercise[]>(() => composeMission(profile.learner, 6, Math.random, focus))
+  const [list] = useState<Exercise[]>(() => composeMission(profile.learner, 8, Math.random, focus))
   const lessonSkill = focus ?? currentSkill(profile.learner)
   const needLesson = !profile.learner.skills[lessonSkill].introSeen
   const [phase, setPhase] = useState<'story' | 'lesson' | 'play' | 'reward'>('story')
   const [idx, setIdx] = useState(0)
   const [mood, setMood] = useState<Mood>('idle')
   const [bubble, setBubble] = useState('')
+  const [combo, setCombo] = useState(0)
   const [gains, setGains] = useState<Gains>({ coins: 0, cubes: 0, firstTry: 0, persevere: 0, mastered: [], reviewsOk: 0 })
   const cat = profile.cat
   const ex = list[idx]
@@ -45,11 +48,17 @@ export function MissionScreen({ profile, update, missionId, focus, onExit }: Pro
     let cubes = r.cubes
     const persevere = !o.firstTry && o.eventually ? 1 : 0
     if (persevere) coins += 4
+    const c = o.firstTry ? combo + 1 : 0
+    setCombo(c)
+    if (c >= 3) coins += 2 // série
     if (res.newlyMastered) { coins += 50; cubes += 5 }
     next.coins += coins
     next.cubes += cubes
     addPlayTime(next, Math.min(o.ms, 120000))
     update((p) => Object.assign(p, next))
+    const coinEl = document.querySelector('.play-top .coins')
+    if (coinEl && o.eventually) { const r = coinEl.getBoundingClientRect(); fx.fly(innerWidth / 2, innerHeight / 2, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, 'coins', Math.min(10, 3 + c)) }
+    if (res.newlyMastered) setTimeout(() => fx.burst(innerWidth / 2, innerHeight / 3, 'confetti', 70), 300)
 
     const g: Gains = {
       coins: gains.coins + coins,
@@ -62,7 +71,7 @@ export function MissionScreen({ profile, update, missionId, focus, onExit }: Pro
     setGains(g)
     setBubble(o.eventually ? mission.steps[Math.min(idx, mission.steps.length - 1)] : 'On continue, je suis avec toi !')
     if (idx + 1 >= list.length) {
-      const stars = g.firstTry >= 5 ? 3 : g.firstTry >= 3 ? 2 : 1
+      const stars = g.firstTry >= 7 ? 3 : g.firstTry >= 5 ? 2 : 1
       update((p) => { p.stars += stars; p.missionsDone += 1 })
       sfx.fanfare()
       setTimeout(() => setPhase('reward'), 400)
@@ -72,7 +81,7 @@ export function MissionScreen({ profile, update, missionId, focus, onExit }: Pro
     }
   }
 
-  const stars = gains.firstTry >= 5 ? 3 : gains.firstTry >= 3 ? 2 : 1
+  const stars = gains.firstTry >= 7 ? 3 : gains.firstTry >= 5 ? 2 : 1
 
   if (phase === 'story')
     return (
@@ -126,7 +135,10 @@ export function MissionScreen({ profile, update, missionId, focus, onExit }: Pro
               <b>Nouveau !</b> {[...unlockedItems.map((i) => i.name), ...unlockedAcc.map((a) => a.name), ...unlockedCoats.map((c) => `Pelage ${c.name}`)].join(' · ')}
             </div>
           )}
-          <button className="btn btn-primary big" onClick={onExit}>Retour au village</button>
+          <div className="row">
+            <button className="btn btn-primary big" onClick={onExit}>Retour au village</button>
+            {onRush && <button className="btn btn-ghost big" onClick={() => onRush(lessonSkill)}>⚡ Défi éclair</button>}
+          </div>
         </div>
       </div>
     )
@@ -139,6 +151,7 @@ export function MissionScreen({ profile, update, missionId, focus, onExit }: Pro
         <button className="btn btn-ghost small" onClick={onExit}>✕</button>
         <div className="mission-title">{mission.emoji} {mission.title}</div>
         <div className="dots">{list.map((_, i) => <span key={i} className={i < idx ? 'done' : i === idx ? 'now' : ''} />)}</div>
+        {combo >= 2 && <div key={combo} className="combo">🔥 {combo}</div>}
         <div className="coins">🪙 {profile.coins}</div>
       </div>
       <Scene kind={mission.scene} step={idx} total={list.length} coat={cat.coat} />

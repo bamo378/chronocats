@@ -37,6 +37,8 @@ export interface Profile {
   objects: Placed[]
   badges: string[]
   missionsDone: number
+  /** Meilleur score au défi éclair, par chapitre. */
+  records: Record<string, number>
   /** Temps de jeu par jour (AAAA-MM-JJ → ms). */
   playByDay: Record<string, number>
   lastPlayed?: number
@@ -87,6 +89,7 @@ export function newProfile(id: ProfileId): Profile {
     objects: starterObjects(),
     badges: [],
     missionsDone: 0,
+    records: {},
     playByDay: {},
   }
 }
@@ -94,6 +97,8 @@ export function newProfile(id: ProfileId): Profile {
 /** Complète une sauvegarde ancienne avec les nouveaux champs. */
 function migrate(p: Profile): Profile {
   const fresh = newProfile(p.id)
+  // Ancienne version (lecture de l'heure) : on garde le chat, la ville et les récompenses, et on repart sur les livrets.
+  if ((p.learner as any)?.subject !== 'livrets') p = { ...p, learner: fresh.learner }
   const out = { ...fresh, ...p, learner: { ...fresh.learner, ...p.learner } }
   for (const id of SKILL_ORDER) out.learner.skills[id] = { ...fresh.learner.skills[id], ...(p.learner?.skills?.[id] ?? {}) }
   return out

@@ -7,7 +7,7 @@ import { ItemIcon } from '../components/Sprites'
 import { ITEMS, ITEM_BY_ID, Item, ACCESSORIES, COATS, COAT_UNLOCK, AccessoryId, CoatId } from '../game/catalog'
 import { MISSIONS } from '../game/missions'
 import { currentSkill, dueSkills } from '../engine/learner'
-import { SKILL_BY_ID } from '../engine/skills'
+import { SKILL_BY_ID, SKILLS } from '../engine/skills'
 import { sfx } from '../audio/sound'
 import { Logo } from '../components/Logo'
 
@@ -24,6 +24,7 @@ const CATS: Item['category'][] = ['Sol', 'Nature', 'Maisons', 'Chats', 'Déco', 
 export function Village({ profile, update, parent, go }: Props) {
   const [mode, setMode] = useState<'view' | 'build'>('view')
   const [panel, setPanel] = useState<null | 'missions' | 'cat'>(null)
+  const [rushMode, setRushMode] = useState(false)
   const [tool, setTool] = useState<Tool>('place')
   const [cat, setCatCat] = useState<Item['category']>('Nature')
   const [sel, setSel] = useState<string>('tree')
@@ -161,6 +162,14 @@ export function Village({ profile, update, parent, go }: Props) {
     <div className={`screen village ${mode === 'build' ? 'is-build' : ''}`}>
       <div className="sky" />
       <div className="clouds" />
+      <div className="ambient" aria-hidden>
+        <div className="sun" />
+        <span className="fly" style={{ ['--t' as any]: '19s', ['--d' as any]: '0s' }}>🦋</span>
+        <span className="fly" style={{ ['--t' as any]: '26s', ['--d' as any]: '-9s', top: '-20vh' } as any}>🦋</span>
+        {[[12, 30], [80, 22], [64, 70], [22, 76], [90, 55], [40, 14]].map(([x, y], i) => (
+          <i key={i} className="spark" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${i * 0.4}s` }} />
+        ))}
+      </div>
 
       <header className="hud">
         <button className="hud-me" onClick={() => go({ name: 'home' })} style={{ ['--pc' as any]: profile.color }}>
@@ -206,7 +215,7 @@ export function Village({ profile, update, parent, go }: Props) {
       {mode === 'view' && (
         <nav className="dock">
           <button className="dock-btn main" onClick={() => setPanel('missions')}>
-            <span className="ico">🗺️</span><span>Missions</span>
+            <span className="ico">🎮</span><span>Jouer</span>
             {due.length > 0 && <span className="badge">{due.length}</span>}
           </button>
           <button className="dock-btn" onClick={() => { setMode('build'); setMsg('Choisis un objet, puis touche une case.') }}>
@@ -257,20 +266,37 @@ export function Village({ profile, update, parent, go }: Props) {
       {panel === 'missions' && (
         <div className="sheet-bg" onClick={() => setPanel(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h2>Missions du jour</h2>
+            <h2>On s’entraîne !</h2>
             <p className="sheet-sub">
-              Chapitre {cur.chapter} : <b>{cur.title}</b>
+              Conseillé : <b>{cur.title}</b>
               {due.length > 0 && <> · 🧠 {due.length} révision{due.length > 1 ? 's' : ''} incluse{due.length > 1 ? 's' : ''}</>}
             </p>
-            <div className="mission-list">
+            <div className="mode-toggle" role="group" aria-label="Mode">
+              <button className={!rushMode ? 'on' : ''} onClick={() => setRushMode(false)}>🎯 Apprendre</button>
+              <button className={rushMode ? 'on' : ''} onClick={() => setRushMode(true)}>⚡ Défi éclair</button>
+            </div>
+            <h3>{rushMode ? 'Quel livret pour le défi de 60 secondes ?' : 'Choisis ton livret'}</h3>
+            <div className="livret-pick">
+              {SKILLS.map((s) => {
+                const st = L.skills[s.id]
+                return (
+                  <button key={s.id} className={`lp ${st.mastered ? 'm' : ''} ${s.id === cur.id ? 'cur' : ''}`} onClick={() => { sfx.tap(); go(rushMode ? { name: 'rush', focus: s.id } : { name: 'mission', missionId: MISSIONS[Math.floor(Math.random() * MISSIONS.length)].id, focus: s.id }) }}>
+                    <span className="lp-n">{s.id === 'defi' ? '★' : s.id === 'x1x10' ? '1·10' : s.id.slice(1)}</span>
+                    <span className="lp-s">{rushMode ? `🏆 ${profile.records?.[s.id] ?? 0}` : st.mastered ? '🏅' : s.id === 'defi' ? 'Défi' : '×'}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {!rushMode && <h3>Ou une aventure guidée (avec les révisions)</h3>}
+            {!rushMode && <div className="mission-list">
               {MISSIONS.map((m) => (
                 <button key={m.id} className="mission-card" onClick={() => { sfx.tap(); go({ name: 'mission', missionId: m.id }) }}>
                   <span className="mc-emoji">{m.emoji}</span>
                   <span className="mc-title">{m.title}</span>
-                  <span className="mc-sub">6 étapes · environ 4 min</span>
+                  <span className="mc-sub">8 calculs · environ 4 min</span>
                 </button>
               ))}
-            </div>
+            </div>}
             <button className="btn btn-ghost" onClick={() => setPanel(null)}>Fermer</button>
           </div>
         </div>

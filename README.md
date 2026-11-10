@@ -1,21 +1,24 @@
 # ChronoCats
 
-**Construis ton monde, maîtrise le temps !**
+**Construis ton monde, maîtrise les livrets !**
 
-Jeu éducatif pour apprendre à lire l’heure sur une horloge à aiguilles, pensé pour Anaëlle et Alice (11 ans). Principalement pour iPad, fonctionne aussi sur smartphone et ordinateur. Installable sur l’écran d’accueil (PWA).
+Jeu éducatif pour apprendre les livrets (tables de multiplication) de 1 à 12, pensé pour Anaëlle et Alice (11 ans). Principalement pour iPad, fonctionne aussi sur smartphone et ordinateur. Installable sur l’écran d’accueil (PWA).
 
-## Ce que contient la phase 1
+## Ce que contient le jeu
 
-- **Deux profils séparés** (Anaëlle, Alice) : chat, ville, pièces, cubes, étoiles, progression et statistiques propres à chacune.
-- **Chat compagnon** : nom, 6 pelages (le fantastique se débloque), accessoires débloqués par la maîtrise des chapitres, animations et réactions.
-- **Horloge interactive exacte** : on tire les aiguilles au doigt ; la petite aiguille avance de 0,5° par minute (à 8 h 45 elle est presque sur le 9).
-- **Diagnostic « Le Grand Réveil »** (environ 5 minutes) qui place chaque enfant au bon chapitre.
-- **Moteur pédagogique** : 12 chapitres, exercices générés à l’infini (lire, régler, choisir la bonne horloge, corriger une horloge fausse, expressions « et quart », « moins le quart »…), détection des erreurs typiques, explications après chaque erreur, nouvel essai, indices, remédiation ciblée si les aiguilles sont confondues, révisions espacées (1, 3, 7, 14, 30 jours, ajustées selon la réussite).
-- **3 missions d’aventure** : retrouver Pompon le chaton, réparer la tour, faire partir le train.
-- **Construction** : île isométrique en voxels, objets à poser, déplacer et ranger, déblocages liés à la progression, sauvegarde automatique.
-- **Carte de l’archipel** : 6 îles, 12 chapitres, rejouer n’importe quel chapitre ouvert.
-- **Espace parents** protégé par code : temps de jeu, précision, compétences, erreurs fréquentes, recommandations, durée de séance conseillée, réinitialiser un chapitre sans effacer la ville.
-- Sons doux désactivables, pas de publicité, pas d’achats, aucune pénalité en cas d’absence.
+ChronoCats fait travailler **les livrets de 1 à 12, jusqu’à × 12**.
+
+- **Deux profils séparés** (Anaëlle, Alice) : chat, ville, pièces, cubes, étoiles, records et progression propres à chacune.
+- **Chat compagnon** : nom, 6 pelages, accessoires débloqués en maîtrisant des livrets, animations et réactions.
+- **Diagnostic « Le Grand Réveil »** : chaque livret réussi rallume un cristal ; l’enfant commence au bon niveau.
+- **Choix libre du livret** : on peut entraîner n’importe quel livret à tout moment.
+- **Exercices variés générés à l’infini** : 4 choix, je tape le résultat, nombre caché (7 × ? = 56), vrai ou faux, quadrillage de cubes.
+- **Moteur pédagogique** : suivi de chaque calcul (les calculs ratés reviennent plus souvent), erreurs typiques repérées (résultat voisin, addition au lieu de multiplication, chiffres inversés), explication et nouvel essai après une erreur, astuces par livret, révisions espacées (1, 3, 7, 14, 30 jours).
+- **Défi éclair** : 60 secondes de calculs enchaînés, séries, chat qui court vers son record. La vitesse ne compte jamais pour la maîtrise.
+- **Missions d’aventure** : retrouver Pompon, réparer la tour, faire partir le train.
+- **Construction** de l’île en voxels, avec objets débloqués par la progression.
+- **Espace parents** protégé par code : temps de jeu, précision, livrets maîtrisés, calculs les plus difficiles, erreurs fréquentes, conseils, durée de séance, réinitialisation d’un livret sans effacer la ville.
+- Effets visuels (étoiles, pièces, confettis), sons doux désactivables, aucune publicité, aucun achat, aucune pénalité en cas d’absence.
 
 Le jeu des livrets (tables de multiplication) reste disponible sur `/livret/`.
 
@@ -24,13 +27,14 @@ Le jeu des livrets (tables de multiplication) reste disponible sur `/livret/`.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # tests de l'horloge et du moteur pédagogique
+npm test         # tests du moteur pédagogique
 npm run build    # version de production dans dist/
 ```
 
-## Mise en ligne (Netlify)
+## Mise en ligne
 
-Le fichier `netlify.toml` est prêt : commande `npm run build`, dossier publié `dist`. Relier le dépôt GitHub dans Netlify suffit ; chaque push sur `main` redéploie.
+Le jeu est publié avec **GitHub Pages** : chaque push sur `main` lance `.github/workflows/pages.yml`, qui teste, construit et publie sur https://bamo378.github.io/chronocats/.
+Le fichier `netlify.toml` reste prêt si l’on veut passer par Netlify.
 
 ## Sauvegardes
 
@@ -39,11 +43,11 @@ Phase 1 : sauvegarde locale sur l’appareil (une clé par enfant, jamais mélan
 ## Organisation du code
 
 ```
-src/engine/    moteur pédagogique : horloge, chapitres, exercices, maîtrise, révisions, diagnostic (+ tests)
+src/engine/    moteur pédagogique : livrets, exercices, maîtrise, suivi des calculs, révisions, diagnostic (+ tests)
 src/game/      catalogue d'objets, accessoires, îles, missions
 src/profiles/  profils, sauvegarde, réglages parents
-src/components/ horloge, chat, île isométrique, exercices, leçons, scènes
-src/screens/   accueil, création du chat, diagnostic, village, mission, carte, parents
+src/components/ chat, île isométrique, exercices, quadrillage, leçons, scènes, effets
+src/screens/   accueil, création du chat, diagnostic, village, mission, défi éclair, carte, parents
 ```
 
 Le moteur est indépendant de l’affichage : on pourra y ajouter d’autres matières (maths, lecture) plus tard.

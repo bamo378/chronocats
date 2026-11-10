@@ -15,7 +15,7 @@ export function MapScreen({ profile, onBack, onPlay }: { profile: Profile; onBac
       <div className="clouds" />
       <header className="map-top">
         <button className="btn btn-ghost" onClick={onBack}>← Village</button>
-        <h1>L’Archipel des Douze Heures</h1>
+        <h1>L’Archipel des Douze</h1>
         <div />
       </header>
       <div className="islands">
@@ -37,10 +37,10 @@ export function MapScreen({ profile, onBack, onPlay }: { profile: Profile; onBac
                   const pct = st.mastered ? 100 : Math.round(Math.min(1, st.score / 0.8) * 100)
                   return (
                     <button key={s} className={`chap ${st.mastered ? 'm' : ''} ${s === cur ? 'cur' : ''}`} disabled={!unlocked} onClick={() => { sfx.tap(); onPlay(s) }}>
-                      <span className="chap-n">{unlocked ? SKILL_BY_ID[s].chapter : '🔒'}</span>
-                      <span className="chap-t">{SKILL_BY_ID[s].short}</span>
+                      <span className="chap-n">{s === 'defi' ? '★' : s === 'x1x10' ? '1·10' : s.slice(1)}</span>
+                      <span className="chap-t">{SKILL_BY_ID[s].title}</span>
                       <span className="chap-bar"><i style={{ width: `${pct}%` }} /></span>
-                      <span className="chap-s">{st.mastered ? (isDue(st, now) ? '🧠 à réviser' : '🏅 maîtrisé') : unlocked ? 'en cours' : 'bientôt'}</span>
+                      <span className="chap-s">{st.mastered ? (isDue(st, now) ? '🧠 à réviser' : '🏅 maîtrisé') : st.attempts ? 'en cours' : s === cur ? 'conseillé' : 'à découvrir'}</span>
                     </button>
                   )
                 })}
@@ -49,7 +49,7 @@ export function MapScreen({ profile, onBack, onPlay }: { profile: Profile; onBac
           )
         })}
       </div>
-      <p className="map-note">Touche un chapitre ouvert pour rejouer ou t’entraîner.</p>
+      <p className="map-note">Choisis le livret que tu veux entraîner.</p>
     </div>
   )
 }

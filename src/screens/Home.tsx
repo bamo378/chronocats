@@ -22,7 +22,7 @@ export function Home({ onChoose, onParent, sound, toggleSound }: Props) {
       <img className="home-art" src={`${import.meta.env.BASE_URL}assets/archipel.jpg`} alt="" />
       <div className="home-top">
         <Logo />
-        <p className="slogan">Construis ton monde, maîtrise le temps !</p>
+        <p className="slogan">Construis ton monde, maîtrise les livrets !</p>
       </div>
 
       <div className="profile-cards">
@@ -38,7 +38,7 @@ export function Home({ onChoose, onParent, sound, toggleSound }: Props) {
                 {p.setupDone ? (
                   <>
                     <span>⭐ {p.stars}</span>
-                    <span>Chapitre {ch!.chapter}</span>
+                    <span>{ch!.short}</span>
                   </>
                 ) : (
                   <span>Nouvelle aventure !</span>
