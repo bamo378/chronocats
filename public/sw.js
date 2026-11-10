@@ -1,6 +1,7 @@
 // ChronoCats — service worker simple : le jeu marche hors ligne après une première visite.
-const CACHE = 'chronocats-v1';
-const CORE = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png', '/assets/archipel.jpg', '/assets/archipel-small.jpg'];
+const CACHE = 'chronocats-v2';
+const BASE = new URL('./', self.location).pathname; // '/' sur Netlify, '/chronocats/' sur GitHub Pages
+const CORE = ['', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'assets/archipel.jpg', 'assets/archipel-small.jpg'].map((p) => BASE + p);
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
@@ -18,7 +19,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   // Pages : réseau d'abord, cache en secours.
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('/index.html', copy)); return r; }).catch(() => caches.match('/index.html')));
+    e.respondWith(fetch(req).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(BASE + 'index.html', copy)); return r; }).catch(() => caches.match(BASE + 'index.html')));
     return;
   }
   // Fichiers du jeu et polices : cache d'abord.

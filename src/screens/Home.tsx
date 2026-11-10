@@ -19,7 +19,7 @@ export function Home({ onChoose, onParent, sound, toggleSound }: Props) {
     <div className="screen home">
       <div className="sky" />
       <div className="clouds" />
-      <img className="home-art" src="/assets/archipel.jpg" alt="" />
+      <img className="home-art" src={`${import.meta.env.BASE_URL}assets/archipel.jpg`} alt="" />
       <div className="home-top">
         <Logo />
         <p className="slogan">Construis ton monde, maîtrise le temps !</p>
