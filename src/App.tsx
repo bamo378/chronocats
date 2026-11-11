@@ -8,6 +8,8 @@ import { Parent } from './screens/Parent'
 import { Hub, Tab } from './screens/hub/Hub'
 import { Session, SessionMode } from './screens/Session'
 import { LessonScreen } from './screens/LessonScreen'
+import { Train } from './screens/Train'
+import { Test } from './screens/Test'
 import { Speed } from './games/Speed'
 import { Memory } from './games/Memory'
 import { Bubbles } from './games/Bubbles'
@@ -25,6 +27,8 @@ export type Screen =
   | { name: 'hub' }
   | { name: 'session'; mode: SessionMode; tables: number[] }
   | { name: 'lesson'; table: number }
+  | { name: 'train'; tables: number[]; n?: number }
+  | { name: 'test'; tables: number[]; n?: number }
   | { name: 'game'; id: GameDef['id']; n?: number }
   | { name: 'duel'; a: string; b: string; n?: number }
   | { name: 'daily' }
@@ -98,8 +102,12 @@ function Game() {
       return <Diagnostic profile={profile} update={update} onDone={back} />
     case 'session':
       return <Session key={JSON.stringify(screen)} {...common} mode={screen.mode} tables={screen.tables} onAgain={() => go({ ...screen })} />
+    case 'train':
+      return <Train key={screen.n ?? 0} {...common} tables={screen.tables} onAgain={() => go({ ...screen, n: Date.now() })} onTest={() => go({ name: 'test', tables: screen.tables })} />
+    case 'test':
+      return <Test key={screen.n ?? 0} {...common} tables={screen.tables} onAgain={() => go({ ...screen, n: Date.now() })} onTrain={() => go({ name: 'train', tables: screen.tables })} />
     case 'lesson':
-      return <LessonScreen table={screen.table} onExit={back} onPractice={() => go({ name: 'session', mode: 'learn', tables: [screen.table] })} />
+      return <LessonScreen table={screen.table} onExit={back} onPractice={() => go({ name: 'train', tables: [screen.table] })} />
     case 'game': {
       const again = () => go({ ...screen, n: Date.now() })
       const k = `${screen.id}-${screen.n ?? 0}`

@@ -152,3 +152,34 @@ describe('livrets au choix', () => {
     expect(levelFromXp(120 + 142).level).toBe(3)
   })
 })
+
+import { medalFor, trainPoints, testPlan, testPassed } from '../game/medals'
+describe('points, médailles et tests', () => {
+  it('médailles', () => {
+    expect(medalFor(0).tier).toBe(0)
+    expect(medalFor(150).tier).toBe(1)
+    expect(medalFor(149).tier).toBe(0)
+    expect(medalFor(200).frac).toBeCloseTo(0.2)
+    expect(medalFor(800).tier).toBe(3)
+  })
+  it('points', () => {
+    expect(trainPoints(true, true, false, 1)).toBe(10)
+    expect(trainPoints(false, true, false, 0)).toBe(4)
+    expect(trainPoints(true, true, true, 0)).toBe(5)
+    expect(trainPoints(true, true, false, 5)).toBe(16)
+    expect(trainPoints(false, false, false, 0)).toBe(0)
+  })
+  it('plan de test', () => {
+    const one = testPlan([7])
+    expect(one).toHaveLength(12)
+    expect(new Set(one.map((q) => q.n)).size).toBe(12)
+    const two = testPlan([3, 8])
+    expect(two).toHaveLength(24)
+    const many = testPlan([2, 3, 4, 5, 6, 7, 8, 9])
+    expect(many.length).toBeLessThanOrEqual(24)
+    for (const q of many) expect([2, 3, 4, 5, 6, 7, 8, 9]).toContain(q.table)
+    expect(testPassed(11, 12)).toBe(true)
+    expect(testPassed(10, 12)).toBe(false)
+    expect(testPassed(3, 3)).toBe(false)
+  })
+})

@@ -8,8 +8,10 @@ Jeu éducatif pour apprendre les livrets (tables de multiplication) de 1 à 12, 
 
 ChronoCats fait travailler **les livrets de 1 à 12, jusqu’à × 12**, avec une interface sombre et moderne pensée pour l’iPad (rail de navigation à gauche) et le téléphone (barre en bas).
 
-- **Accueil** : livret conseillé, objectif du jour (40 bonnes réponses), accès rapide au défi du jour, à Éclair, aux erreurs et au duel.
-- **S’entraîner** : choix libre de plusieurs livrets à la fois (avec raccourcis « Tous », « Les faciles », « Les costauds », « Mes points faibles »), puis un mode : Apprendre (10 calculs adaptés, astuces), Libre (sans chrono ni limite), Mes erreurs, Revoir un livret.
+- **Livrets** (écran principal) : 1) choisir un ou plusieurs livrets de 1 à 12 ; 2) choisir un mode :
+  - **S’entraîner** : 20 questions avec astuces et deuxième chance ; chaque bonne réponse rapporte des points au livret (bonus de série). Médailles par livret : bronze 150, argent 400, or 800 points.
+  - **Tester mes connaissances** : sans aide ni deuxième essai, réponses tapées ; 90 % de réussite sur un livret = son diplôme.
+  - En plus : revoir un livret, mes erreurs, défi du jour, objectif du jour.
 - **Jeux** (sur les livrets choisis) : Éclair (60 s), Survie (3 vies, chrono par calcul qui raccourcit), Bulles (éclater la bonne réponse), Memory (paires calcul–résultat), Vrai ou faux (45 s). Records personnels.
 - **Arène** : Duel sur le même écran (chacune sur ses propres livrets, l’iPad posé à plat se partage en deux), Défi du jour (20 calculs identiques pour les deux sœurs, premier essai seulement), Objectif commun de la semaine (600 bonnes réponses à deux → récompense pour les deux îles), tableau des records.
 - **Progrès** : niveau, précision, la grande table 12 × 12 colorée calcul par calcul, maîtrise de chaque livret, badges.

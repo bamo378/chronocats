@@ -47,6 +47,10 @@ export interface Profile {
   games: GameResult[]
   /** Objets offerts par l'objectif commun. */
   bonusItems: string[]
+  /** Points d'entraînement par livret (médailles). */
+  points: Record<number, number>
+  /** Meilleur résultat au test par livret (pourcentage) et diplôme obtenu. */
+  tests: Record<number, { best: number; passed: boolean; at: number }>
   /** Temps de jeu par jour (AAAA-MM-JJ → ms). */
   playByDay: Record<string, number>
   lastPlayed?: number
@@ -111,6 +115,8 @@ export function newProfile(id: ProfileId): Profile {
     selection: [2, 3, 4, 5],
     games: [],
     bonusItems: [],
+    points: {},
+    tests: {},
     playByDay: {},
   }
 }
