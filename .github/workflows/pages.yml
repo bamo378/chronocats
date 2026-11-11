@@ -29,6 +29,9 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
       - run: cp dist/index.html dist/404.html
+      # Si la source Pages est encore « Deploy from a branch », GitHub publie aussi le code brut :
+      # on attend un peu pour que notre version construite soit toujours publiée en dernier.
+      - run: sleep 60
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
