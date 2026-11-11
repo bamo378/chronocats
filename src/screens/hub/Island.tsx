@@ -1,30 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { Profile, ParentSettings, Placed, today, GRID } from '../profiles/store'
-import { UpdateProfile, Screen } from '../App'
-import { IsoIsland } from '../components/IsoIsland'
-import { Cat, Mood } from '../components/Cat'
-import { ItemIcon } from '../components/Sprites'
-import { ITEMS, ITEM_BY_ID, Item, ACCESSORIES, COATS, COAT_UNLOCK, AccessoryId, CoatId } from '../game/catalog'
-import { MISSIONS } from '../game/missions'
-import { currentSkill, dueSkills } from '../engine/learner'
-import { SKILL_BY_ID, SKILLS } from '../engine/skills'
-import { sfx } from '../audio/sound'
-import { Logo } from '../components/Logo'
+import { Profile, Placed, GRID } from '../../profiles/store'
+import { IsoIsland } from '../../components/IsoIsland'
+import { Cat, Mood } from '../../components/Cat'
+import { ItemIcon } from '../../components/Sprites'
+import { ITEMS, ITEM_BY_ID, Item, ACCESSORIES, COATS, COAT_UNLOCK, AccessoryId, CoatId } from '../../game/catalog'
+import { SKILL_BY_ID } from '../../engine/skills'
+import { TabHeader, TabProps } from './Hub'
+import { Icon } from '../../components/Icon'
+import { UpdateProfile } from '../../App'
+import { sfx } from '../../audio/sound'
 
-interface Props {
-  profile: Profile
-  update: UpdateProfile
-  parent: ParentSettings
-  go: (s: Screen) => void
-}
 
 type Tool = 'place' | 'move' | 'erase'
 const CATS: Item['category'][] = ['Sol', 'Nature', 'Maisons', 'Chats', 'Déco', 'Blocs']
 
-export function Village({ profile, update, parent, go }: Props) {
+export function Island({ profile, update }: TabProps) {
   const [mode, setMode] = useState<'view' | 'build'>('view')
-  const [panel, setPanel] = useState<null | 'missions' | 'cat'>(null)
-  const [rushMode, setRushMode] = useState(false)
+  const [panel, setPanel] = useState<null | 'cat'>(null)
   const [tool, setTool] = useState<Tool>('place')
   const [cat, setCatCat] = useState<Item['category']>('Nature')
   const [sel, setSel] = useState<string>('tree')
@@ -38,10 +30,8 @@ export function Village({ profile, update, parent, go }: Props) {
 
   const L = profile.learner
   const mastered = (s?: string) => !s || L.skills[s as keyof typeof L.skills]?.mastered
-  const due = dueSkills(L)
-  const cur = SKILL_BY_ID[currentSkill(L)]
-  const playedToday = Math.round((profile.playByDay[today()] ?? 0) / 60000)
-  const enough = playedToday >= parent.sessionMinutes
+  const unlocked = (i: Item) => (i.bonus ? profile.bonusItems.includes(i.id) : mastered(i.unlock))
+  const lockText = (i: Item) => (i.bonus ? 'Récompense de l’objectif commun (Arène).' : `Maîtrise ${SKILL_BY_ID[i.unlock!].title.toLowerCase()} pour le débloquer.`)
 
   const occupied = (x: number, y: number) => profile.objects.find((o) => o.x === x && o.y === y)
   const walkable = (x: number, y: number) => {
@@ -115,7 +105,7 @@ export function Village({ profile, update, parent, go }: Props) {
     if (tool !== 'place') return
     const it = ITEM_BY_ID[sel]
     if (!it) return
-    if (!mastered(it.unlock)) { setMsg(`Débloqué au chapitre ${SKILL_BY_ID[it.unlock!].chapter}.`); return }
+    if (!unlocked(it)) { setMsg(lockText(it)); return }
     if (!canAfford(it)) { setMsg('Il te faut plus de pièces ou de cubes. Joue une mission !'); return }
     if (it.layer === 'ground') {
       if (profile.ground[y][x] === it.id) return
@@ -159,87 +149,52 @@ export function Village({ profile, update, parent, go }: Props) {
   const items = ITEMS.filter((i) => i.category === cat)
 
   return (
-    <div className={`screen village ${mode === 'build' ? 'is-build' : ''}`}>
-      <div className="sky" />
-      <div className="clouds" />
-      <div className="ambient" aria-hidden>
-        <div className="sun" />
-        <span className="fly" style={{ ['--t' as any]: '19s', ['--d' as any]: '0s' }}>🦋</span>
-        <span className="fly" style={{ ['--t' as any]: '26s', ['--d' as any]: '-9s', top: '-20vh' } as any}>🦋</span>
-        {[[12, 30], [80, 22], [64, 70], [22, 76], [90, 55], [40, 14]].map(([x, y], i) => (
-          <i key={i} className="spark" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${i * 0.4}s` }} />
-        ))}
-      </div>
-
-      <header className="hud">
-        <button className="hud-me" onClick={() => go({ name: 'home' })} style={{ ['--pc' as any]: profile.color }}>
-          <span className="hud-avatar"><Cat coat={profile.cat.coat} accessory={profile.cat.accessory} mood="happy" size="100%" /></span>
-          <span className="hud-name">{profile.name}</span>
-        </button>
-        <Logo small />
-        <div className="hud-res">
-          <span className="res">🪙 {profile.coins}</span>
-          <span className="res">🧊 {profile.cubes}</span>
-          <span className="res">⭐ {profile.stars}</span>
+    <section className={`view village ${mode === 'build' ? 'is-build' : ''}`}>
+      <TabHeader title="Mon île" sub="Construis avec ce que tu gagnes en jouant." profile={profile}>
+        {mode === 'view' && (
+          <>
+            <button className="btn btn-ghost small" onClick={() => setPanel('cat')}><Icon name="paw" size={18} /> {profile.cat.name || 'Mon chat'}</button>
+            <button className="btn btn-primary small" onClick={() => { setMode('build'); setMsg('Choisis un objet, puis touche une case.') }}><Icon name="hammer" size={18} /> Construire</button>
+          </>
+        )}
+      </TabHeader>
+      <div className="island-stage">
+        <div className="stars" aria-hidden />
+        <div className="island-wrap">
+          <IsoIsland
+            ground={profile.ground}
+            objects={profile.objects}
+            showGrid={mode === 'build'}
+            selectedId={moving}
+            onTile={onTile}
+            onObject={onObject}
+            bursts={bursts}
+            actor={
+              mode === 'view'
+                ? {
+                    ...catPos,
+                    node: (
+                      <g transform="translate(-26 -52)" onClick={(e) => { e.stopPropagation(); petCat() }} className="world-cat">
+                        <Cat coat={profile.cat.coat} accessory={profile.cat.accessory} mood={catMood} size={54} flip={flip} />
+                      </g>
+                    ),
+                  }
+                : undefined
+            }
+          />
         </div>
-      </header>
-
-      {enough && mode === 'view' && (
-        <div className="banner">😺 Belle séance aujourd’hui ({playedToday} min) ! {profile.cat.name} te propose une pause. Ta ville t’attendra.</div>
-      )}
-
-      <main className="island-wrap">
-        <IsoIsland
-          ground={profile.ground}
-          objects={profile.objects}
-          showGrid={mode === 'build'}
-          selectedId={moving}
-          onTile={onTile}
-          onObject={onObject}
-          bursts={bursts}
-          actor={
-            mode === 'view'
-              ? {
-                  ...catPos,
-                  node: (
-                    <g transform="translate(-26 -52)" onClick={(e) => { e.stopPropagation(); petCat() }} className="world-cat">
-                      <Cat coat={profile.cat.coat} accessory={profile.cat.accessory} mood={catMood} size={54} flip={flip} />
-                    </g>
-                  ),
-                }
-              : undefined
-          }
-        />
-      </main>
-
-      {mode === 'view' && (
-        <nav className="dock">
-          <button className="dock-btn main" onClick={() => setPanel('missions')}>
-            <span className="ico">🎮</span><span>Jouer</span>
-            {due.length > 0 && <span className="badge">{due.length}</span>}
-          </button>
-          <button className="dock-btn" onClick={() => { setMode('build'); setMsg('Choisis un objet, puis touche une case.') }}>
-            <span className="ico">🧱</span><span>Construire</span>
-          </button>
-          <button className="dock-btn" onClick={() => go({ name: 'map' })}>
-            <span className="ico">🏝️</span><span>Archipel</span>
-          </button>
-          <button className="dock-btn" onClick={() => setPanel('cat')}>
-            <span className="ico">🐱</span><span>{profile.cat.name || 'Mon chat'}</span>
-          </button>
-        </nav>
-      )}
+      </div>
 
       {mode === 'build' && (
         <section className="build-tray">
           <div className="tray-top">
             <div className="tools">
-              {([['place', '➕ Poser'], ['move', '✋ Déplacer'], ['erase', '🧺 Ranger']] as [Tool, string][]).map(([t, l]) => (
+              {([['place', 'Poser'], ['move', 'Déplacer'], ['erase', 'Ranger']] as [Tool, string][]).map(([t, l]) => (
                 <button key={t} className={`chip ${tool === t ? 'on' : ''}`} onClick={() => { setTool(t); setMoving(null); setMsg(t === 'place' ? 'Choisis un objet, puis touche une case.' : t === 'move' ? 'Touche un objet à déplacer.' : 'Touche un objet pour le ranger, ou un sol pour remettre de l’herbe.') }}>{l}</button>
               ))}
             </div>
             <div className="tray-msg">{msg}</div>
-            <button className="btn btn-primary" onClick={() => { setMode('view'); setMoving(null) }}>✔ Fini</button>
+            <button className="btn btn-primary" onClick={() => { setMode('view'); setMoving(null) }}><Icon name="check" size={18} /> Terminé</button>
           </div>
           {tool === 'place' && (
             <>
@@ -248,12 +203,12 @@ export function Village({ profile, update, parent, go }: Props) {
               </div>
               <div className="items">
                 {items.map((i) => {
-                  const locked = !mastered(i.unlock)
+                  const locked = !unlocked(i)
                   return (
-                    <button key={i.id} className={`item ${sel === i.id ? 'on' : ''} ${locked ? 'locked' : ''} ${!canAfford(i) ? 'poor' : ''}`} onClick={() => { sfx.tap(); setSel(i.id); setMsg(locked ? `🔒 Maîtrise le chapitre ${SKILL_BY_ID[i.unlock!].chapter} pour débloquer.` : `${i.name} : touche une case.`) }}>
+                    <button key={i.id} className={`item ${sel === i.id ? 'on' : ''} ${locked ? 'locked' : ''} ${!canAfford(i) ? 'poor' : ''}`} onClick={() => { sfx.tap(); setSel(i.id); setMsg(locked ? lockText(i) : `${i.name} : touche une case.`) }}>
                       <span className="item-ico"><ItemIcon item={i.id} layer={i.layer} /></span>
-                      <span className="item-name">{locked ? '🔒 ' : ''}{i.name}</span>
-                      <span className="item-cost">{i.coins ? `🪙${i.coins}` : ''}{i.cubes ? ` 🧊${i.cubes}` : ''}{!i.coins && !i.cubes ? 'Gratuit' : ''}</span>
+                      <span className="item-name">{locked && <Icon name="lock" size={12} />} {i.name}</span>
+                      <span className="item-cost">{i.coins ? <><Icon name="coin" size={12} />{i.coins}</> : null}{i.cubes ? <> <Icon name="cube" size={12} />{i.cubes}</> : null}{!i.coins && !i.cubes ? 'Gratuit' : ''}</span>
                     </button>
                   )
                 })}
@@ -263,47 +218,8 @@ export function Village({ profile, update, parent, go }: Props) {
         </section>
       )}
 
-      {panel === 'missions' && (
-        <div className="sheet-bg" onClick={() => setPanel(null)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h2>On s’entraîne !</h2>
-            <p className="sheet-sub">
-              Conseillé : <b>{cur.title}</b>
-              {due.length > 0 && <> · 🧠 {due.length} révision{due.length > 1 ? 's' : ''} incluse{due.length > 1 ? 's' : ''}</>}
-            </p>
-            <div className="mode-toggle" role="group" aria-label="Mode">
-              <button className={!rushMode ? 'on' : ''} onClick={() => setRushMode(false)}>🎯 Apprendre</button>
-              <button className={rushMode ? 'on' : ''} onClick={() => setRushMode(true)}>⚡ Défi éclair</button>
-            </div>
-            <h3>{rushMode ? 'Quel livret pour le défi de 60 secondes ?' : 'Choisis ton livret'}</h3>
-            <div className="livret-pick">
-              {SKILLS.map((s) => {
-                const st = L.skills[s.id]
-                return (
-                  <button key={s.id} className={`lp ${st.mastered ? 'm' : ''} ${s.id === cur.id ? 'cur' : ''}`} onClick={() => { sfx.tap(); go(rushMode ? { name: 'rush', focus: s.id } : { name: 'mission', missionId: MISSIONS[Math.floor(Math.random() * MISSIONS.length)].id, focus: s.id }) }}>
-                    <span className="lp-n">{s.id === 'defi' ? '★' : s.id === 'x1x10' ? '1·10' : s.id.slice(1)}</span>
-                    <span className="lp-s">{rushMode ? `🏆 ${profile.records?.[s.id] ?? 0}` : st.mastered ? '🏅' : s.id === 'defi' ? 'Défi' : '×'}</span>
-                  </button>
-                )
-              })}
-            </div>
-            {!rushMode && <h3>Ou une aventure guidée (avec les révisions)</h3>}
-            {!rushMode && <div className="mission-list">
-              {MISSIONS.map((m) => (
-                <button key={m.id} className="mission-card" onClick={() => { sfx.tap(); go({ name: 'mission', missionId: m.id }) }}>
-                  <span className="mc-emoji">{m.emoji}</span>
-                  <span className="mc-title">{m.title}</span>
-                  <span className="mc-sub">8 calculs · environ 4 min</span>
-                </button>
-              ))}
-            </div>}
-            <button className="btn btn-ghost" onClick={() => setPanel(null)}>Fermer</button>
-          </div>
-        </div>
-      )}
-
       {panel === 'cat' && <CatPanel profile={profile} update={update} onClose={() => setPanel(null)} />}
-    </div>
+    </section>
   )
 }
 
@@ -330,9 +246,9 @@ function CatPanel({ profile, update, onClose }: { profile: Profile; update: Upda
               const need = COAT_UNLOCK[c.id]
               const locked = need && !L.skills[need].mastered
               return (
-                <button key={c.id} className={`coat ${profile.cat.coat === c.id ? 'on' : ''}`} disabled={!!locked} onClick={() => setCoat(c.id)} title={locked ? `Chapitre ${SKILL_BY_ID[need!].chapter}` : c.name}>
+                <button key={c.id} className={`coat ${profile.cat.coat === c.id ? 'on' : ''}`} disabled={!!locked} onClick={() => setCoat(c.id)} title={locked ? SKILL_BY_ID[need!].title : c.name}>
                   <Cat coat={c.id} size={48} />
-                  <span>{locked ? '🔒' : c.name}</span>
+                  <span>{locked ? SKILL_BY_ID[need!].short : c.name}</span>
                 </button>
               )
             })}
@@ -343,7 +259,7 @@ function CatPanel({ profile, update, onClose }: { profile: Profile; update: Upda
               const locked = a.unlock && !L.skills[a.unlock].mastered
               return (
                 <button key={a.id} className={`chip ${profile.cat.accessory === a.id ? 'on' : ''}`} disabled={!!locked} onClick={() => setAcc(a.id)}>
-                  {locked ? `🔒 ${a.name} · ch. ${SKILL_BY_ID[a.unlock!].chapter}` : a.name}
+                  {locked ? `${a.name} · ${SKILL_BY_ID[a.unlock!].short}` : a.name}
                 </button>
               )
             })}

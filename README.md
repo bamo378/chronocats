@@ -6,19 +6,16 @@ Jeu éducatif pour apprendre les livrets (tables de multiplication) de 1 à 12, 
 
 ## Ce que contient le jeu
 
-ChronoCats fait travailler **les livrets de 1 à 12, jusqu’à × 12**.
+ChronoCats fait travailler **les livrets de 1 à 12, jusqu’à × 12**, avec une interface sombre et moderne pensée pour l’iPad (rail de navigation à gauche) et le téléphone (barre en bas).
 
-- **Deux profils séparés** (Anaëlle, Alice) : chat, ville, pièces, cubes, étoiles, records et progression propres à chacune.
-- **Chat compagnon** : nom, 6 pelages, accessoires débloqués en maîtrisant des livrets, animations et réactions.
-- **Diagnostic « Le Grand Réveil »** : chaque livret réussi rallume un cristal ; l’enfant commence au bon niveau.
-- **Choix libre du livret** : on peut entraîner n’importe quel livret à tout moment.
-- **Exercices variés générés à l’infini** : 4 choix, je tape le résultat, nombre caché (7 × ? = 56), vrai ou faux, quadrillage de cubes.
-- **Moteur pédagogique** : suivi de chaque calcul (les calculs ratés reviennent plus souvent), erreurs typiques repérées (résultat voisin, addition au lieu de multiplication, chiffres inversés), explication et nouvel essai après une erreur, astuces par livret, révisions espacées (1, 3, 7, 14, 30 jours).
-- **Défi éclair** : 60 secondes de calculs enchaînés, séries, chat qui court vers son record. La vitesse ne compte jamais pour la maîtrise.
-- **Missions d’aventure** : retrouver Pompon, réparer la tour, faire partir le train.
-- **Construction** de l’île en voxels, avec objets débloqués par la progression.
-- **Espace parents** protégé par code : temps de jeu, précision, livrets maîtrisés, calculs les plus difficiles, erreurs fréquentes, conseils, durée de séance, réinitialisation d’un livret sans effacer la ville.
-- Effets visuels (étoiles, pièces, confettis), sons doux désactivables, aucune publicité, aucun achat, aucune pénalité en cas d’absence.
+- **Accueil** : livret conseillé, objectif du jour (40 bonnes réponses), accès rapide au défi du jour, à Éclair, aux erreurs et au duel.
+- **S’entraîner** : choix libre de plusieurs livrets à la fois (avec raccourcis « Tous », « Les faciles », « Les costauds », « Mes points faibles »), puis un mode : Apprendre (10 calculs adaptés, astuces), Libre (sans chrono ni limite), Mes erreurs, Revoir un livret.
+- **Jeux** (sur les livrets choisis) : Éclair (60 s), Survie (3 vies, chrono par calcul qui raccourcit), Bulles (éclater la bonne réponse), Memory (paires calcul–résultat), Vrai ou faux (45 s). Records personnels.
+- **Arène** : Duel sur le même écran (chacune sur ses propres livrets, l’iPad posé à plat se partage en deux), Défi du jour (20 calculs identiques pour les deux sœurs, premier essai seulement), Objectif commun de la semaine (600 bonnes réponses à deux → récompense pour les deux îles), tableau des records.
+- **Progrès** : niveau, précision, la grande table 12 × 12 colorée calcul par calcul, maîtrise de chaque livret, badges.
+- **Mon île** : construction en voxels avec les pièces et cubes gagnés, chat compagnon personnalisable.
+- **Moteur pédagogique** : suivi de chaque calcul (les calculs ratés reviennent plus souvent), erreurs typiques repérées, explication et nouvel essai, révisions espacées, test de niveau au départ. La vitesse des jeux ne compte jamais pour valider un livret.
+- **Espace parents** protégé par code ; aucune publicité, aucun achat, aucune pénalité en cas d’absence.
 
 Le jeu des livrets (tables de multiplication) reste disponible sur `/livret/`.
 
@@ -44,10 +41,11 @@ Phase 1 : sauvegarde locale sur l’appareil (une clé par enfant, jamais mélan
 
 ```
 src/engine/    moteur pédagogique : livrets, exercices, maîtrise, suivi des calculs, révisions, diagnostic (+ tests)
-src/game/      catalogue d'objets, accessoires, îles, missions
+src/game/      catalogue d'objets, accessoires, jeux, récompenses
 src/profiles/  profils, sauvegarde, réglages parents
-src/components/ chat, île isométrique, exercices, quadrillage, leçons, scènes, effets
-src/screens/   accueil, création du chat, diagnostic, village, mission, défi éclair, carte, parents
+src/components/ icônes, éléments d'interface, chat, île isométrique, exercices, leçons, effets
+src/screens/   profils, création du chat, test de niveau, séances, onglets (hub/), parents
+src/games/     Éclair, Survie, Bulles, Memory, Vrai ou faux, Duel, Défi du jour
 ```
 
 Le moteur est indépendant de l’affichage : on pourra y ajouter d’autres matières (maths, lecture) plus tard.

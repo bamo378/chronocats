@@ -4,6 +4,7 @@ import { UpdateProfile } from '../App'
 import { newDiag, nextDiagExercise, diagAnswer, applyDiagnostic, diagProgress, LADDER } from '../engine/diagnostic'
 import { ExerciseView } from '../components/ExerciseView'
 import { Cat, Mood } from '../components/Cat'
+import { Icon } from '../components/Icon'
 import { SKILL_BY_ID, SKILL_ORDER, SkillId } from '../engine/skills'
 import { sfx } from '../audio/sound'
 
@@ -40,14 +41,13 @@ export function Diagnostic({ profile, update, onDone }: { profile: Profile; upda
   if (phase === 'intro')
     return (
       <div className="screen story">
-        <div className="sky dusk" />
-        <div className="panel story-panel">
-          <Cat coat={cat.coat} accessory={cat.accessory} mood="wow" size={170} />
-          <h1>Le Grand Réveil</h1>
-          <p className="lead">Oh non ! Les cristaux de l’Archipel des Douze se sont éteints.</p>
-          <p className="lead">Chaque livret que tu connais en rallume un. Montre à {cat.name} ce que tu sais déjà !</p>
-          <p className="small-note">Ce n’est pas une interro : réponds comme tu peux, ça aide {cat.name} à préparer ton aventure.</p>
-          <button className="btn btn-primary big" onClick={() => setPhase('play')}>Allumer les cristaux ✨</button>
+        <div className="story-card">
+          <Cat coat={cat.coat} accessory={cat.accessory} mood="wow" size={120} />
+          <div className="eyebrow">2 à 4 minutes</div>
+          <h1>Test de niveau</h1>
+          <p className="lead">On passe les livrets du plus simple au plus costaud. Chaque livret réussi est validé tout de suite.</p>
+          <p className="muted">Ce n’est pas une note : réponds comme tu peux, ça sert à te proposer les bons exercices.</p>
+          <button className="btn btn-primary big" onClick={() => setPhase('play')}><Icon name="play" fill /> Commencer</button>
         </div>
       </div>
     )
@@ -55,36 +55,31 @@ export function Diagnostic({ profile, update, onDone }: { profile: Profile; upda
   if (phase === 'end' && start)
     return (
       <div className="screen story">
-        <div className="sky" />
-        <div className="panel story-panel">
-          <Cat coat={cat.coat} accessory={cat.accessory} mood="cheer" size={170} className="jump" />
-          <h1>Merci, {profile.name} !</h1>
-          <p className="lead">{diag.current.passed.length} {diag.current.passed.length > 1 ? 'cristaux rallumés' : 'cristal rallumé'} sur {crystals}.</p>
-          <p className="lead">On commence par <b>{SKILL_BY_ID[start].title}</b>. Tu pourras aussi choisir n’importe quel livret sur la carte.</p>
-          <div className="reward-row"><span className="pill">🪙 +30 pièces de bienvenue</span></div>
-          <button className="btn btn-primary big" onClick={onDone}>Découvrir mon île 🏝️</button>
+        <div className="story-card">
+          <Cat coat={cat.coat} accessory={cat.accessory} mood="cheer" size={120} className="jump" />
+          <div className="eyebrow">Test terminé</div>
+          <h1>{diag.current.passed.length} livret{diag.current.passed.length > 1 ? 's' : ''} validé{diag.current.passed.length > 1 ? 's' : ''} sur {crystals}</h1>
+          <div className="diag-chips">
+            {LADDER.map((r, i) => <span key={r} className={`dchip ${i < diag.current.passed.length ? 'ok' : ''}`}>{SKILL_BY_ID[r].short}</span>)}
+          </div>
+          <p className="lead">Conseillé pour commencer : <b>{SKILL_BY_ID[start].title.toLowerCase()}</b>. Tu peux aussi choisir librement tes livrets.</p>
+          <div className="rewards"><span className="reward"><Icon name="coin" size={16} /> +30 pièces de bienvenue</span></div>
+          <button className="btn btn-primary big" onClick={onDone}>C’est parti <Icon name="right" /></button>
         </div>
       </div>
     )
 
   return (
     <div className="screen play">
-      <div className="sky dusk" />
-      <div className="play-top">
-        <div className="crystals">
-          {LADDER.map((r, i) => (
-            <span key={r} className={`crystal ${i < diag.current.passed.length ? 'lit' : ''}`} title={SKILL_BY_ID[r].short}>◆</span>
-          ))}
-        </div>
-        <div className="progress"><i style={{ width: `${diagProgress(diag.current) * 100}%` }} /></div>
+      <div className="gamebar">
+        <span className="gb-title">Test de niveau<small>{SKILL_BY_ID[LADDER[Math.min(diag.current.rung, LADDER.length - 1)]].title}</small></span>
+        <span className="gb-progress"><i style={{ width: `${diagProgress(diag.current) * 100}%` }} /></span>
+        <span className="diag-dots">
+          {LADDER.map((r, i) => <i key={r} className={i < diag.current.passed.length ? 'ok' : i === diag.current.rung ? 'now' : ''} title={SKILL_BY_ID[r].short} />)}
+        </span>
+        <span className="gb-cat"><Cat coat={cat.coat} accessory={cat.accessory} mood={mood} size="100%" /></span>
       </div>
-      <div className="play-body">
-        <div className="buddy">
-          <Cat coat={cat.coat} accessory={cat.accessory} mood={mood} size={110} />
-          <div className="bubble">On essaie ensemble !</div>
-        </div>
-        {ex && <ExerciseView ex={ex} diagnostic onDone={done} onCatMood={setMood} />}
-      </div>
+      {ex && <ExerciseView ex={ex} diagnostic onDone={done} onCatMood={setMood} />}
     </div>
   )
 }

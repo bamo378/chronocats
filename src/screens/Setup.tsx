@@ -4,6 +4,7 @@ import { COATS, CoatId, COAT_UNLOCK } from '../game/catalog'
 import { Profile } from '../profiles/store'
 import { UpdateProfile } from '../App'
 import { sfx } from '../audio/sound'
+import { Icon } from '../components/Icon'
 
 const IDEAS = ['Moustache', 'Caramel', 'Tic-Tac', 'Nuage', 'Biscuit', 'Pixel', 'Câline', 'Minuit']
 
@@ -14,11 +15,11 @@ export function Setup({ profile, update, onDone, onBack }: { profile: Profile; u
 
   return (
     <div className="screen setup">
-      <div className="sky" />
-      <button className="btn btn-ghost back" onClick={onBack}>← Retour</button>
-      <div className="panel setup-panel">
-        <h1>Bonjour {profile.name} !</h1>
-        <p className="lead">Voici ton chat compagnon. Choisis son pelage et donne-lui un nom.</p>
+      <button className="icon-btn back" onClick={onBack} aria-label="Retour"><Icon name="left" /></button>
+      <div className="setup-panel">
+        <div className="eyebrow">Bienvenue {profile.name}</div>
+        <h1>Ton chat compagnon</h1>
+        <p className="lead">Il t’accompagne dans les jeux et vit sur ton île. Choisis son pelage et son nom.</p>
         <div className="setup-main">
           <div className="setup-cat">
             <Cat coat={coat} mood="happy" size="100%" />
@@ -31,7 +32,7 @@ export function Setup({ profile, update, onDone, onBack }: { profile: Profile; u
                 return (
                   <button key={c.id} className={`coat ${coat === c.id ? 'on' : ''}`} disabled={locked} onClick={() => { sfx.tap(); setCoat(c.id) }}>
                     <Cat coat={c.id} size={64} />
-                    <span>{locked ? '🔒 ' : ''}{c.name}</span>
+                    <span>{c.name}</span>
                   </button>
                 )
               })}
@@ -54,7 +55,7 @@ export function Setup({ profile, update, onDone, onBack }: { profile: Profile; u
                 onDone()
               }}
             >
-              C’est parti !
+              Continuer
             </button>
           </div>
         </div>

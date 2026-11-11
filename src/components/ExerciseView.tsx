@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Exercise, ErrorType, checkTyped, explain, hint as hintText } from '../engine/exercises'
 import { sfx } from '../audio/sound'
-import { CHEERS, COMFORT } from '../game/missions'
+import { Icon } from './Icon'
+import { Keypad } from './ui'
+
+const CHEERS = ['Bravo !', 'Exact !', 'Parfait !', 'Bien vu !', 'Impeccable !', 'Juste !', 'Excellent !']
+const COMFORT = ['Pas grave, réessaie.', 'Presque !', 'Bien tenté.', 'On réessaie.']
 import { CubeArray } from './CubeArray'
 import { fx } from './Fx'
 
@@ -162,15 +166,7 @@ export function ExerciseView({ ex, onDone, diagnostic, onCatMood }: Props) {
           </div>
         )}
 
-        {isTyping && (
-          <div className="pad" role="group" aria-label="Pavé de chiffres">
-            {['7', '8', '9', '4', '5', '6', '1', '2', '3', '⌫', '0', 'OK'].map((k) => (
-              <button key={k} className={`key ${k === 'OK' ? 'key-ok' : ''} ${k === '⌫' ? 'key-del' : ''}`} disabled={locked || (k === 'OK' && !typed)} onClick={() => press(k)}>
-                {k}
-              </button>
-            ))}
-          </div>
-        )}
+        {isTyping && <Keypad onKey={press} disabled={locked} okDisabled={!typed} />}
 
         {fb && (
           <div className={`feedback ${fb.ok ? 'ok' : 'ko'}`}>
@@ -186,10 +182,10 @@ export function ExerciseView({ ex, onDone, diagnostic, onCatMood }: Props) {
 
         {!diagnostic && !locked && !hintOn && (
           <button className="btn btn-ghost hint-btn" onClick={() => { setHintOn(true); onCatMood?.('wow') }}>
-            💡 Une astuce
+            <Icon name="bulb" size={18} /> Une astuce
           </button>
         )}
-        {hintOn && !fb?.ok && <div className="hint">💡 {hintText(ex)}</div>}
+        {hintOn && !fb?.ok && <div className="hint"><Icon name="bulb" size={18} /> {hintText(ex)}</div>}
       </div>
     </div>
   )

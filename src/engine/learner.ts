@@ -1,7 +1,7 @@
 // Moteur adaptatif : maîtrise par livret, suivi de chaque calcul, répétition espacée, remédiation ciblée.
 
-import { SKILL_ORDER, SkillId } from './skills'
-import { ErrorType, Exercise, ExerciseKind, generate, Rng, factKey, FactWeight } from './exercises'
+import { SKILL_ORDER, SkillId, skillForTable } from './skills'
+import { ErrorType, Exercise, ExerciseKind, generate, generateFor, generateFact, Rng, factKey, FactWeight } from './exercises'
 
 export const DAY = 24 * 3600 * 1000
 /** Intervalles de révision indicatifs (jours), ajustés selon la réussite. */
@@ -237,4 +237,93 @@ export function stats(L: LearnerState, days: number, now = Date.now()) {
     reviewAccuracy: reviews.length ? reviews.filter((r) => r.correct).length / reviews.length : undefined,
     reviews: reviews.length,
   }
+}
+
+// ---------- Sélection libre de livrets ----------
+
+export type FactLevel = 'new' | 'weak' | 'ok' | 'strong'
+
+/** Niveau d'un calcul d'après l'historique (indépendant de l'ordre : 7 × 8 = 8 × 7). */
+export function factLevel(L: LearnerState, a: number, b: number): FactLevel {
+  const f = L.facts[factKey(a, b)]
+  if (!f || f.ok + f.ko === 0) return 'new'
+  const acc = f.ok / (f.ok + f.ko)
+  if (f.ok >= 3 && acc >= 0.85) return 'strong'
+  if (acc >= 0.6) return 'ok'
+  return 'weak'
+}
+
+const LEVEL_SCORE: Record<FactLevel, number> = { new: 0, weak: 0.2, ok: 0.6, strong: 1 }
+
+/** Maîtrise d'un livret, de 0 à 1 (les 12 calculs du livret). */
+export function tableMastery(L: LearnerState, t: number): number {
+  let s = 0
+  for (let n = 1; n <= 12; n++) s += LEVEL_SCORE[factLevel(L, t, n)]
+  return s / 12
+}
+
+/** Calculs fragiles (ratés plus souvent que réussis), éventuellement limités à certains livrets. */
+export function weakFacts(L: LearnerState, tables?: number[]): { table: number; n: number }[] {
+  const out: { table: number; n: number }[] = []
+  const seen = new Set<string>()
+  const ts = tables && tables.length ? tables : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  for (const t of ts) for (let n = 1; n <= 12; n++) {
+    const k = factKey(t, n)
+    if (seen.has(k)) continue
+    if (factLevel(L, t, n) === 'weak') { seen.add(k); out.push({ table: t, n }) }
+  }
+  return out
+}
+
+/**
+ * Séance d'entraînement sur les livrets choisis : révisions dues de ces livrets d'abord (2 max),
+ * puis des calculs tirés en favorisant ceux qui sont fragiles ou jamais vus.
+ */
+export function composeSession(L: LearnerState, tables: number[], count = 10, rng: Rng = Math.random, now = Date.now()): Exercise[] {
+  const ts = tables.length ? tables : [2, 3, 4, 5, 6, 7, 8, 9]
+  const w = factWeights(L)
+  const lvl = (t: number, n: number) => factLevel(L, t, n)
+  const list: Exercise[] = []
+  const dueTables = ts.filter((t) => isDue(L.skills[skillForTable(t)], now))
+  for (const t of dueTables.slice(0, 2)) list.push(generateFor([t], rng, undefined, w, lvl))
+  if (needsMeaningRemediation(L)) list.push(generateFor(ts.filter((t) => t > 1 && t < 10).length ? ts.filter((t) => t > 1 && t < 10) : [3], rng, 'array', w))
+  while (list.length < count) list.push(generateFor(ts, rng, undefined, w, lvl))
+  return list
+}
+
+/** Séance « mes erreurs » : uniquement les calculs fragiles. */
+export function composeErrors(L: LearnerState, tables: number[], count = 10, rng: Rng = Math.random): Exercise[] {
+  const weak = weakFacts(L, tables)
+  if (!weak.length) return []
+  const list: Exercise[] = []
+  for (let i = 0; i < count; i++) {
+    const f = weak[i % weak.length]
+    list.push(generateFact(f.table, f.n, rng, i < weak.length ? 'choice' : rng() < 0.5 ? 'type' : 'missing'))
+  }
+  return list.sort(() => rng() - 0.5)
+}
+
+// ---------- Niveaux ----------
+
+/** Niveau à partir de l'expérience : chaque niveau demande un peu plus que le précédent. */
+export function levelFromXp(xp: number): { level: number; into: number; need: number } {
+  let level = 1
+  let need = 120
+  let rest = Math.max(0, Math.floor(xp))
+  while (rest >= need) { rest -= need; level++; need = Math.round(need * 1.18) }
+  return { level, into: rest, need }
+}
+
+/** Bonnes réponses d'un jour donné (pour l'objectif du jour). */
+export function correctOnDay(L: LearnerState, day: Date = new Date()): number {
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime()
+  const end = start + DAY
+  return L.log.filter((l) => l.correct && l.at >= start && l.at < end).length
+}
+
+/** Bonnes réponses depuis lundi (objectif commun de la semaine). */
+export function correctThisWeek(L: LearnerState, now = new Date()): number {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const monday = d.getTime() - ((d.getDay() + 6) % 7) * DAY
+  return L.log.filter((l) => l.correct && l.at >= monday).length
 }

@@ -1,7 +1,7 @@
 // Générateur d'exercices de livrets : variantes infinies, distracteurs tirés
 // des vraies erreurs d'enfants, explications et astuces par livret.
 
-import { SKILL_BY_ID, SkillId, MAX_FACTOR } from './skills'
+import { SKILL_BY_ID, SkillId, MAX_FACTOR, skillForTable } from './skills'
 
 export type Rng = () => number
 
@@ -64,11 +64,15 @@ export const factKey = (a: number, b: number) => (a <= b ? `${a}x${b}` : `${b}x$
 export type FactWeight = (table: number, n: number) => number
 
 export function pickFact(skill: SkillId, rng: Rng, weight?: FactWeight): { table: number; n: number } {
-  const tables = SKILL_BY_ID[skill].tables
+  return pickFactFrom(SKILL_BY_ID[skill].tables, rng, weight, skill !== 'x1x10')
+}
+
+/** Tire un calcul parmi plusieurs livrets. `dampEasy` : fois 1 et fois 10 moins souvent. */
+export function pickFactFrom(tables: number[], rng: Rng, weight?: FactWeight, dampEasy = true): { table: number; n: number } {
   const all: { table: number; n: number; w: number }[] = []
+  const onlyEasy = tables.every((t) => t === 1 || t === 10)
   for (const t of tables) for (let n = 1; n <= MAX_FACTOR; n++) {
-    // fois 1 et fois 10 sont faciles : moins souvent, sauf dans leur propre chapitre
-    let w = skill !== 'x1x10' && (n === 1 || n === 10) ? 0.35 : 1
+    let w = dampEasy && !onlyEasy && (n === 1 || n === 10) && t !== 1 && t !== 10 ? 0.35 : 1
     if (weight) w *= weight(t, n)
     all.push({ table: t, n, w })
   }
@@ -132,10 +136,26 @@ const KINDS: Record<SkillId, ExerciseKind[]> = {
   defi: ['type', 'type', 'missing', 'choice', 'trueFalse'],
 }
 
-/** Fabrique un exercice. `kind` peut être imposé, `weight` oriente vers les calculs fragiles. */
+/** Fabrique un exercice pour un chapitre. `kind` peut être imposé, `weight` oriente vers les calculs fragiles. */
 export function generate(skill: SkillId, rng: Rng = Math.random, kind?: ExerciseKind, weight?: FactWeight): Exercise {
-  let k = kind ?? pick(rng, KINDS[skill])
   const { table, n } = pickFact(skill, rng, weight)
+  return build(skillForTable(table), table, n, kind ?? pick(rng, KINDS[skill]), rng)
+}
+
+/** Exercice tiré parmi plusieurs livrets choisis. `level` donne le niveau d'un calcul pour adapter le type d'exercice. */
+export function generateFor(tables: number[], rng: Rng = Math.random, kind?: ExerciseKind, weight?: FactWeight, level?: (t: number, n: number) => 'new' | 'weak' | 'ok' | 'strong'): Exercise {
+  const { table, n } = pickFactFrom(tables.length ? tables : [2, 3, 4, 5, 6, 7, 8, 9], rng, weight)
+  return generateFact(table, n, rng, kind, level?.(table, n))
+}
+
+/** Exercice sur un calcul précis (révision des erreurs). */
+export function generateFact(table: number, n: number, rng: Rng = Math.random, kind?: ExerciseKind, lvl?: 'new' | 'weak' | 'ok' | 'strong'): Exercise {
+  const k = kind ?? (lvl === 'new' || lvl === 'weak' ? pick(rng, ['choice', 'choice', 'type', 'array'] as ExerciseKind[]) : lvl === 'strong' ? pick(rng, ['type', 'type', 'missing', 'trueFalse'] as ExerciseKind[]) : pick(rng, ['choice', 'type', 'type', 'missing', 'trueFalse'] as ExerciseKind[]))
+  return build(skillForTable(table), table, n, k, rng)
+}
+
+function build(skill: SkillId, table: number, n: number, kind: ExerciseKind, rng: Rng): Exercise {
+  let k = kind
   // Quadrillage : on garde des tailles qu'on peut regarder (pas 12 × 12 cubes).
   if (k === 'array' && table * n > 60) k = 'choice'
   const swap = rng() < 0.5

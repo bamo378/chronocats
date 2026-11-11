@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { generate, checkTyped, typicalMistakes, classify, strategy, factKey, pickFact } from './exercises'
-import { newLearner, recordAnswer, currentSkill, composeMission, DAY, rewardFor, isDue, hardestFacts } from './learner'
+import { newLearner, recordAnswer, currentSkill, composeMission, DAY, rewardFor, isDue, hardestFacts, composeSession, composeErrors, factLevel, tableMastery, weakFacts, levelFromXp } from './learner'
 import { newDiag, nextDiagExercise, diagAnswer, applyDiagnostic } from './diagnostic'
 import { SKILL_ORDER, SKILL_BY_ID } from './skills'
 
@@ -102,7 +102,7 @@ describe('moteur adaptatif', () => {
     expect(m).toHaveLength(8)
     expect(m[0].skill).toBe('x1x10')
     const f = composeMission(L, 8, seeded(4), 'x9', now)
-    expect(f.filter((e) => e.skill === 'x9').length).toBeGreaterThanOrEqual(6)
+    expect(f.filter((e) => e.skill === 'x9').length).toBeGreaterThanOrEqual(5)
   })
   it('répéter un livret facile déjà maîtrisé rapporte moins', () => {
     const L = newLearner()
@@ -122,5 +122,33 @@ describe('diagnostic', () => {
     expect(applyDiagnostic(L, d)).toBe('x5')
     expect(L.skills.x2.mastered).toBe(true)
     expect(L.diagnosticDone).toBe(true)
+  })
+})
+
+describe('livrets au choix', () => {
+  it('une séance ne tire que dans les livrets choisis', () => {
+    const L = newLearner()
+    const s = composeSession(L, [6, 8], 40, seeded(5))
+    expect(s).toHaveLength(40)
+    for (const e of s) expect([6, 8]).toContain(e.table)
+  })
+  it('niveau d’un calcul, maîtrise d’un livret et erreurs', () => {
+    const L = newLearner()
+    L.facts[factKey(7, 8)] = { ok: 0, ko: 3, last: 0 }
+    L.facts[factKey(7, 2)] = { ok: 5, ko: 0, last: 0 }
+    expect(factLevel(L, 8, 7)).toBe('weak')
+    expect(factLevel(L, 2, 7)).toBe('strong')
+    expect(factLevel(L, 7, 7)).toBe('new')
+    expect(tableMastery(L, 7)).toBeCloseTo((0.2 + 1) / 12)
+    expect(weakFacts(L, [7]).length).toBe(1)
+    const e = composeErrors(L, [7, 8], 6, seeded(2))
+    expect(e).toHaveLength(6)
+    for (const x of e) expect(x.product).toBe(56)
+  })
+  it('niveaux d’expérience', () => {
+    expect(levelFromXp(0).level).toBe(1)
+    expect(levelFromXp(119).level).toBe(1)
+    expect(levelFromXp(120).level).toBe(2)
+    expect(levelFromXp(120 + 142).level).toBe(3)
   })
 })

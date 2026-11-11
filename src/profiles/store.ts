@@ -37,11 +37,28 @@ export interface Profile {
   objects: Placed[]
   badges: string[]
   missionsDone: number
-  /** Meilleur score au défi éclair, par chapitre. */
+  /** Meilleur résultat par jeu (identifiant du jeu → score ; pour Memory, temps en secondes). */
   records: Record<string, number>
+  /** Points d'expérience (niveaux). */
+  xp: number
+  /** Livrets choisis pour s'entraîner et jouer. */
+  selection: number[]
+  /** Dernières parties (pour les progrès et le classement). */
+  games: GameResult[]
+  /** Objets offerts par l'objectif commun. */
+  bonusItems: string[]
   /** Temps de jeu par jour (AAAA-MM-JJ → ms). */
   playByDay: Record<string, number>
   lastPlayed?: number
+}
+
+export interface GameResult {
+  game: string
+  score: number
+  correct: number
+  total: number
+  tables: number[]
+  at: number
 }
 
 export const GRID = 10
@@ -90,6 +107,10 @@ export function newProfile(id: ProfileId): Profile {
     badges: [],
     missionsDone: 0,
     records: {},
+    xp: 0,
+    selection: [2, 3, 4, 5],
+    games: [],
+    bonusItems: [],
     playByDay: {},
   }
 }
@@ -100,6 +121,9 @@ function migrate(p: Profile): Profile {
   // Ancienne version (lecture de l'heure) : on garde le chat, la ville et les récompenses, et on repart sur les livrets.
   if ((p.learner as any)?.subject !== 'livrets') p = { ...p, learner: fresh.learner }
   const out = { ...fresh, ...p, learner: { ...fresh.learner, ...p.learner } }
+  // Les anciens records étaient rangés par chapitre : on les oublie.
+  if (out.records && Object.keys(out.records).some((k) => /^x\d|^defi$/.test(k))) out.records = {}
+  if (!Array.isArray(out.selection) || !out.selection.length) out.selection = [2, 3, 4, 5]
   for (const id of SKILL_ORDER) out.learner.skills[id] = { ...fresh.learner.skills[id], ...(p.learner?.skills?.[id] ?? {}) }
   return out
 }
@@ -167,4 +191,45 @@ export async function hashPin(pin: string): Promise<string> {
   let h = 0
   for (const b of data) h = (h * 31 + b) | 0
   return 'x' + (h >>> 0).toString(16)
+}
+
+/** Enregistre une partie : historique, record, expérience. Renvoie true si c'est un nouveau record. */
+export function recordGame(p: Profile, r: Omit<GameResult, 'at'>, lowerIsBetter = false): boolean {
+  p.games = [...(p.games ?? []), { ...r, at: Date.now() }].slice(-200)
+  const prev = p.records[r.game]
+  const better = prev === undefined || (lowerIsBetter ? r.score < prev : r.score > prev)
+  if (better && (lowerIsBetter || r.score > 0)) p.records = { ...p.records, [r.game]: r.score }
+  return better && prev !== undefined && (lowerIsBetter || r.score > 0)
+}
+
+// ---- Arène : données partagées entre les deux sœurs (duels, défi du jour, objectif commun) ----
+
+export interface Duel { a: string; b: string; sa: number; sb: number; at: number }
+export interface DailyEntry { score: number; ms: number; at: number }
+export interface ArenaData {
+  duels: Duel[]
+  /** AAAA-MM-JJ → profil → résultat (seul le premier essai compte). */
+  daily: Record<string, Partial<Record<ProfileId, DailyEntry>>>
+  /** Semaines (lundi AAAA-MM-JJ) dont la récompense commune a été remise. */
+  coopClaimed: string[]
+}
+
+const AKEY = 'chronocats.v1.arena'
+
+export function loadArena(): ArenaData {
+  try {
+    const raw = localStorage.getItem(AKEY)
+    if (raw) return { duels: [], daily: {}, coopClaimed: [], ...JSON.parse(raw) }
+  } catch { /* rien */ }
+  return { duels: [], daily: {}, coopClaimed: [] }
+}
+
+export function saveArena(a: ArenaData): void {
+  try { localStorage.setItem(AKEY, JSON.stringify(a)) } catch { /* rien */ }
+}
+
+export function mondayKey(d = new Date()): string {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
+  return today(x)
 }

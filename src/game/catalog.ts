@@ -15,6 +15,8 @@ export interface Item {
   unlock?: SkillId
   /** Objet pouvant être posé sur l'eau (pont). */
   onWater?: boolean
+  /** Offert par l'objectif commun (pas par la maîtrise). */
+  bonus?: boolean
   category: 'Sol' | 'Nature' | 'Maisons' | 'Déco' | 'Chats' | 'Blocs'
 }
 
@@ -44,6 +46,7 @@ export const ITEMS: Item[] = [
   { id: 'bench', name: 'Banc', layer: 'object', coins: 12, cubes: 0, category: 'Déco' },
   { id: 'table', name: 'Table de pique-nique', layer: 'object', coins: 15, cubes: 1, category: 'Déco', unlock: 'x5' },
   { id: 'bridge', name: 'Pont', layer: 'object', coins: 20, cubes: 2, category: 'Déco', onWater: true, unlock: 'x3' },
+  { id: 'statue', name: 'Statue dorée', layer: 'object', coins: 0, cubes: 0, category: 'Déco', bonus: true },
   { id: 'crystal', name: 'Fontaine de cristal', layer: 'object', coins: 80, cubes: 8, category: 'Déco', unlock: 'x12' },
   // Blocs
   { id: 'block-pink', name: 'Cube rose', layer: 'object', coins: 0, cubes: 1, category: 'Blocs' },

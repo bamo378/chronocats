@@ -233,6 +233,21 @@ export function ObjectSprite({ item }: { item: string }) {
           <circle className="glow" cx={0} cy={-36} r={22} fill="#9ad8ff" opacity={0.3} />
         </g>
       )
+    case 'statue':
+      return (
+        <g>
+          <Cube s={16} h={12} color="#d9cbbd" top="#ebe0d4" />
+          <g transform="translate(0 -12)">
+            <ellipse cx={0} cy={-14} rx={12} ry={14} fill="#f5c542" />
+            <path d="M -11 -24 L -9 -40 L -2 -28 Z M 11 -24 L 9 -40 L 2 -28 Z" fill="#e8b324" />
+            <ellipse cx={0} cy={-30} rx={10} ry={9} fill="#ffd966" />
+            <ellipse cx={-4} cy={-30} rx={2} ry={2.4} fill="#a87a0c" />
+            <ellipse cx={4} cy={-30} rx={2} ry={2.4} fill="#a87a0c" />
+            <path d="M -6 -14 q 6 6 12 0" stroke="#fff3c4" strokeWidth={2} fill="none" />
+            <circle className="glow" cx={0} cy={-22} r={20} fill="#ffe38a" opacity={0.25} />
+          </g>
+        </g>
+      )
     case 'block-pink':
       return <Cube s={22} h={22} color="#ffa7c7" top="#ffc4da" />
     case 'block-blue':

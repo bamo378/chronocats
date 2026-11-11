@@ -1,33 +1,42 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Profile, ProfileId, loadProfile, saveProfile, loadParent, ParentSettings, saveParent } from './profiles/store'
 import { setSound } from './audio/sound'
-import { SkillId } from './engine/skills'
 import { Home } from './screens/Home'
 import { Setup } from './screens/Setup'
 import { Diagnostic } from './screens/Diagnostic'
-import { Village } from './screens/Village'
-import { MissionScreen } from './screens/Mission'
-import { MapScreen } from './screens/MapScreen'
 import { Parent } from './screens/Parent'
-import { MISSIONS } from './game/missions'
+import { Hub, Tab } from './screens/hub/Hub'
+import { Session, SessionMode } from './screens/Session'
+import { LessonScreen } from './screens/LessonScreen'
+import { Speed } from './games/Speed'
+import { Memory } from './games/Memory'
+import { Bubbles } from './games/Bubbles'
+import { TrueFalse } from './games/TrueFalse'
+import { Duel } from './games/Duel'
+import { Daily } from './games/Daily'
 import { FxLayer } from './components/Fx'
-import { Rush } from './screens/Rush'
+import { SvgDefs } from './components/ui'
+import { GameDef } from './game/games'
 
 export type Screen =
   | { name: 'home' }
   | { name: 'setup' }
   | { name: 'diagnostic' }
-  | { name: 'village' }
-  | { name: 'mission'; missionId: string; focus?: SkillId }
-  | { name: 'map' }
+  | { name: 'hub' }
+  | { name: 'session'; mode: SessionMode; tables: number[] }
+  | { name: 'lesson'; table: number }
+  | { name: 'game'; id: GameDef['id']; n?: number }
+  | { name: 'duel'; a: string; b: string; n?: number }
+  | { name: 'daily' }
   | { name: 'parent' }
-  | { name: 'rush'; focus: SkillId; n?: number }
 
 export type UpdateProfile = (fn: (p: Profile) => void) => void
+export type Go = (s: Screen) => void
 
 export default function App() {
   return (
     <>
+      <SvgDefs />
       <Game />
       <FxLayer />
     </>
@@ -36,6 +45,7 @@ export default function App() {
 
 function Game() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
+  const [tab, setTab] = useState<Tab>('today')
   const [profile, setProfile] = useState<Profile | null>(null)
   const [parent, setParent] = useState<ParentSettings>(() => loadParent())
 
@@ -60,34 +70,49 @@ function Game() {
     })
   }
 
-  function choose(id: ProfileId) {
-    const p = loadProfile(id)
-    setProfile(p)
-    if (!p.setupDone) setScreen({ name: 'setup' })
-    else if (!p.learner.diagnosticDone) setScreen({ name: 'diagnostic' })
-    else setScreen({ name: 'village' })
-  }
-
-  const go = (s: Screen) => {
+  const go: Go = (s) => {
     window.scrollTo(0, 0)
     setScreen(s)
   }
+  const back = () => go({ name: 'hub' })
+
+  function choose(id: ProfileId) {
+    const p = loadProfile(id)
+    setProfile(p)
+    setTab('today')
+    if (!p.setupDone) setScreen({ name: 'setup' })
+    else if (!p.learner.diagnosticDone) setScreen({ name: 'diagnostic' })
+    else setScreen({ name: 'hub' })
+  }
+
+  const toggleSound = () => updateParent((s) => { s.sound = !s.sound })
 
   if (screen.name === 'parent') return <Parent settings={parent} updateSettings={updateParent} onExit={() => go({ name: 'home' })} />
-  if (screen.name === 'home' || !profile) return <Home onChoose={choose} onParent={() => go({ name: 'parent' })} sound={parent.sound} toggleSound={() => updateParent((s) => { s.sound = !s.sound })} />
+  if (screen.name === 'home' || !profile) return <Home onChoose={choose} onParent={() => go({ name: 'parent' })} sound={parent.sound} toggleSound={toggleSound} />
 
+  const common = { profile, update, onExit: back }
   switch (screen.name) {
     case 'setup':
       return <Setup profile={profile} update={update} onDone={() => go({ name: 'diagnostic' })} onBack={() => go({ name: 'home' })} />
     case 'diagnostic':
-      return <Diagnostic profile={profile} update={update} onDone={() => go({ name: 'village' })} />
-    case 'mission':
-      return <MissionScreen key={screen.missionId + (screen.focus ?? '')} profile={profile} update={update} missionId={screen.missionId} focus={screen.focus} onExit={() => go({ name: 'village' })} onRush={(s) => go({ name: 'rush', focus: s })} />
-    case 'rush':
-      return <Rush key={`${screen.focus}-${screen.n ?? 0}`} profile={profile} update={update} focus={screen.focus} onExit={() => go({ name: 'village' })} onAgain={() => go({ name: 'rush', focus: screen.focus, n: Date.now() })} />
-    case 'map':
-      return <MapScreen profile={profile} onBack={() => go({ name: 'village' })} onPlay={(skill) => go({ name: 'mission', missionId: MISSIONS[Math.floor(Math.random() * MISSIONS.length)].id, focus: skill })} />
+      return <Diagnostic profile={profile} update={update} onDone={back} />
+    case 'session':
+      return <Session key={JSON.stringify(screen)} {...common} mode={screen.mode} tables={screen.tables} onAgain={() => go({ ...screen })} />
+    case 'lesson':
+      return <LessonScreen table={screen.table} onExit={back} onPractice={() => go({ name: 'session', mode: 'learn', tables: [screen.table] })} />
+    case 'game': {
+      const again = () => go({ ...screen, n: Date.now() })
+      const k = `${screen.id}-${screen.n ?? 0}`
+      if (screen.id === 'eclair' || screen.id === 'survie') return <Speed key={k} {...common} mode={screen.id} onAgain={again} />
+      if (screen.id === 'memory') return <Memory key={k} {...common} onAgain={again} />
+      if (screen.id === 'bulles') return <Bubbles key={k} {...common} onAgain={again} />
+      return <TrueFalse key={k} {...common} onAgain={again} />
+    }
+    case 'duel':
+      return <Duel key={screen.n ?? 0} {...common} a={screen.a} b={screen.b} onAgain={() => go({ ...screen, n: Date.now() })} />
+    case 'daily':
+      return <Daily {...common} />
     default:
-      return <Village profile={profile} update={update} parent={parent} go={go} />
+      return <Hub profile={profile} update={update} parent={parent} go={go} tab={tab} setTab={setTab} onSwitch={() => go({ name: 'home' })} sound={parent.sound} toggleSound={toggleSound} />
   }
 }
